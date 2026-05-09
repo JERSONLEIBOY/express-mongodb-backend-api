@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:6
+    container_name: ele_admin_mongodb
+    restart: unless-stopped
+    environment:
+      MONGO_INITDB_DATABASE: ele_admin
+    volumes:
+      - mongodb_data:/data/db
+    ports:
+      - "27017:27017"
+    networks:
+      - ele_admin_network
+
+  app:
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+    container_name: ele_admin_backend
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      MONGODB_URI: mongodb://mongodb:27017/ele_admin
+      JWT_SECRET: ${JWT_SECRET:-your-super-secret-jwt-key-change-in-production}
+      JWT_EXPIRES_IN: ${JWT_EXPIRES_IN:-7d}
+      CORS_ORIGIN: ${CORS_ORIGIN:-*}
+    volumes:
+      - app_uploads:/app/uploads
+      - app_logs:/app/logs
+    ports:
+      - "3000:3000"
+    depends_on:
+      - mongodb
+    networks:
+      - ele_admin_network
+
+volumes:
+  mongodb_data:
+  app_uploads:
+  app_logs:
+
+networks:
+  ele_admin_network:
+    driver: bridge
