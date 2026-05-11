@@ -4,6 +4,16 @@ const fs = require('fs');
 const { config } = require('../config');
 const response = require('../utils/response');
 
+const uploadsDir = path.resolve(config.upload.path);
+
+const safeResolvePath = (filePath) => {
+  const resolved = path.resolve(filePath);
+  if (!resolved.startsWith(uploadsDir + path.sep) && resolved !== uploadsDir) {
+    return null;
+  }
+  return resolved;
+};
+
 const getFiles = async (req, res, next) => {
   try {
     const { page = 1, pageSize = 20, name, sortField = 'uploadTime', sortOrder = 'desc' } = req.query;
@@ -12,8 +22,8 @@ const getFiles = async (req, res, next) => {
 
     if (name) query.name = new RegExp(name, 'i');
 
-    const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10);
-    const limit = parseInt(pageSize, 10);
+    const limit = Math.min(parseInt(pageSize, 10) || 20, 100);
+    const skip = (parseInt(page, 10) - 1) * limit;
 
     const sortObj = {};
     sortObj[sortField] = sortOrder === 'asc' ? 1 : -1;
@@ -88,7 +98,10 @@ const deleteFile = async (req, res, next) => {
       return response.notFound(res, '文件不存在');
     }
 
-    const filePath = path.resolve(file.path);
+    const filePath = safeResolvePath(file.path);
+    if (!filePath) {
+      return response.badRequest(res, '非法文件路径');
+    }
     if (fs.existsSync(filePath)) {
       fs.unlinkSync(filePath);
     }
@@ -110,7 +123,10 @@ const downloadFile = async (req, res, next) => {
       return response.notFound(res, '文件不存在');
     }
 
-    const filePath = path.resolve(file.path);
+    const filePath = safeResolvePath(file.path);
+    if (!filePath) {
+      return response.badRequest(res, '非法文件路径');
+    }
     if (!fs.existsSync(filePath)) {
       return response.notFound(res, '文件已丢失');
     }

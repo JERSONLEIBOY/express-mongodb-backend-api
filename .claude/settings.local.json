@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(npm install *)",
+      "Bash(curl -s http://localhost:3000/health)",
+      "Bash(docker-compose up *)",
+      "Bash(docker run *)",
+      "Bash(docker start *)",
+      "Bash(NODE_ENV=development node src/app.js)",
+      "Bash(echo \"PID=$!\")",
+      "Bash(MONGODB_URI=mongodb://localhost:27017/ele_admin node *)",
+      "mcp__plugin_playwright_playwright__browser_navigate",
+      "mcp__plugin_playwright_playwright__browser_run_code_unsafe",
+      "mcp__plugin_playwright_playwright__browser_evaluate",
+      "Bash(pkill -f \"node src/app.js\")",
+      "Bash(taskkill /F /IM node.exe)",
+      "Bash(taskkill //F //IM node.exe)",
+      "Bash(bash *)",
+      "Bash(awk '{print $2}')",
+      "Bash(xargs '-I{}' sh -c ' *)",
+      "Bash(curl -s -o /dev/null -w \"HTTP %{http_code}\\\\n\" http://localhost:3000/health)",
+      "Bash(netstat -ano)",
+      "Bash(findstr :3000)",
+      "Bash(tasklist /FI \"PID eq 8676\" /FO CSV)",
+      "Bash(tasklist *)",
+      "Bash(taskkill *)",
+      "Bash(node src/app.js)",
+      "Bash(echo \"Started PID $!\")",
+      "mcp__plugin_playwright_playwright__browser_close",
+      "Bash(findstr LISTENING)"
+    ]
+  }
+}

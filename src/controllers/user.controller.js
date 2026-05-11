@@ -12,8 +12,8 @@ const getUsers = async (req, res, next) => {
     if (status) query.status = status;
     if (organization) query.organization = organization;
 
-    const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10);
-    const limit = parseInt(pageSize, 10);
+    const limit = Math.min(parseInt(pageSize, 10) || 20, 100);
+    const skip = (parseInt(page, 10) - 1) * limit;
 
     const sortObj = {};
     sortObj[sortField] = sortOrder === 'asc' ? 1 : -1;
@@ -159,6 +159,11 @@ const updateUserPassword = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { password } = req.body;
+
+    const isAdmin = req.user.roles.some(r => r.code === 'ADMIN');
+    if (!isAdmin && req.user._id.toString() !== id) {
+      return response.forbidden(res, '只能修改自己的密码');
+    }
 
     if (!password || password.length < 6) {
       return response.badRequest(res, '密码长度不能少于6位');

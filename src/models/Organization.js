@@ -10,7 +10,7 @@ const organizationSchema = new mongoose.Schema({
   type: {
     type: String,
     enum: ['company', 'department', 'team'],
-    required: true
+    default: 'team'
   },
   parentId: {
     type: mongoose.Schema.Types.ObjectId,

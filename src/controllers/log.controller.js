@@ -17,8 +17,8 @@ const getLoginLogs = async (req, res, next) => {
       if (endDate) query.loginTime.$lte = new Date(endDate);
     }
 
-    const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10);
-    const limit = parseInt(pageSize, 10);
+    const limit = Math.min(parseInt(pageSize, 10) || 20, 100);
+    const skip = (parseInt(page, 10) - 1) * limit;
 
     const sortObj = {};
     sortObj[sortField] = sortOrder === 'asc' ? 1 : -1;
@@ -88,8 +88,8 @@ const getOperationLogs = async (req, res, next) => {
       if (endDate) query.operationTime.$lte = new Date(endDate);
     }
 
-    const skip = (parseInt(page, 10) - 1) * parseInt(pageSize, 10);
-    const limit = parseInt(pageSize, 10);
+    const limit = Math.min(parseInt(pageSize, 10) || 20, 100);
+    const skip = (parseInt(page, 10) - 1) * limit;
 
     const sortObj = {};
     sortObj[sortField] = sortOrder === 'asc' ? 1 : -1;

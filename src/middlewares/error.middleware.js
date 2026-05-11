@@ -38,6 +38,10 @@ const errorHandler = (err, req, res, next) => {
     return response.badRequest(res, err.message);
   }
 
+  if (err.statusCode === 400) {
+    return response.badRequest(res, err.message);
+  }
+
   const statusCode = err.statusCode || 500;
   const message = err.message || '服务器内部错误';
 

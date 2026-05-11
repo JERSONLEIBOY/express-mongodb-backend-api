@@ -1,6 +1,8 @@
 const Organization = require('../models/Organization');
 const response = require('../utils/response');
 
+const ORGANIZATION_TYPES = ['company', 'department', 'team'];
+
 const getOrganizations = async (req, res, next) => {
   try {
     const { type, status, name } = req.query;
@@ -60,6 +62,10 @@ const createOrganization = async (req, res, next) => {
   try {
     const { name, type, parentId, sort, status } = req.body;
 
+    if (type !== undefined && !ORGANIZATION_TYPES.includes(type)) {
+      return response.badRequest(res, `机构类型必须是 ${ORGANIZATION_TYPES.join('/')} 之一`);
+    }
+
     if (parentId) {
       const parentOrg = await Organization.findById(parentId);
       if (!parentOrg) {
@@ -89,6 +95,10 @@ const updateOrganization = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { name, type, parentId, sort, status } = req.body;
+
+    if (type !== undefined && !ORGANIZATION_TYPES.includes(type)) {
+      return response.badRequest(res, `机构类型必须是 ${ORGANIZATION_TYPES.join('/')} 之一`);
+    }
 
     const organization = await Organization.findById(id);
     if (!organization) {
