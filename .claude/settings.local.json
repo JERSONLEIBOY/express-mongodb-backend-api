@@ -28,7 +28,9 @@
       "Bash(echo \"Started PID $!\")",
       "mcp__plugin_playwright_playwright__browser_close",
       "Bash(findstr LISTENING)",
-      "Bash(curl *)"
+      "Bash(curl *)",
+      "Bash(sudo apt *)",
+      "Bash(nslookup *)"
     ]
   }
 }
