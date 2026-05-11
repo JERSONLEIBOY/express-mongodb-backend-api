@@ -27,7 +27,8 @@
       "Bash(node src/app.js)",
       "Bash(echo \"Started PID $!\")",
       "mcp__plugin_playwright_playwright__browser_close",
-      "Bash(findstr LISTENING)"
+      "Bash(findstr LISTENING)",
+      "Bash(curl *)"
     ]
   }
 }
