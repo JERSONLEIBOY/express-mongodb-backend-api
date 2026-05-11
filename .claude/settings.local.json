@@ -30,7 +30,8 @@
       "Bash(findstr LISTENING)",
       "Bash(curl *)",
       "Bash(sudo apt *)",
-      "Bash(nslookup *)"
+      "Bash(nslookup *)",
+      "Bash(chmod +x deploy.sh upload-deploy.sh)"
     ]
   }
 }
