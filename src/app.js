@@ -10,6 +10,7 @@ const { config, logger, mongoOptions } = require('./config');
 const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middlewares/error.middleware');
 const { operationLogger, requestLogger } = require('./middlewares/logger.middleware');
+const { swaggerUi, specs } = require('./config/swagger');
 
 const app = express();
 
@@ -39,9 +40,13 @@ app.get('/', (req, res) => {
   res.json({
     name: 'Express MongoDB Backend API',
     version: '1.0.0',
-    documentation: '/api/v1'
+    documentation: '/api-docs'
   });
 });
+
+// API 文档端点
+app.use('/api-docs', swaggerUi.serve);
+app.get('/api-docs', swaggerUi.setup(specs));
 
 routes(app);
 

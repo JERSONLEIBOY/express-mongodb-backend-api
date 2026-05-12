@@ -33,7 +33,10 @@
       "Bash(nslookup *)",
       "Bash(chmod +x deploy.sh)",
       "Bash(chmod +x *)",
-      "Bash(deploy.sh *)"
+      "Bash(deploy.sh *)",
+      "Bash(npm start *)",
+      "Bash(pskill node *)",
+      "Bash(node *)"
     ]
   }
 }
