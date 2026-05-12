@@ -31,9 +31,9 @@
       "Bash(curl *)",
       "Bash(sudo apt *)",
       "Bash(nslookup *)",
-      "Bash(chmod +x deploy.sh upload-deploy.sh)",
+      "Bash(chmod +x deploy.sh)",
       "Bash(chmod +x *)",
-      "Bash(./upload-nginx.sh)"
+      "Bash(deploy.sh *)"
     ]
   }
 }
