@@ -1,6 +1,6 @@
 # Express + MongoDB 后台管理后端接口
 
-基于 Express.js 和 MongoDB 的后台管理系统后端接口模板，为 [Ele Admin Plus](https://plus.eleadmin.com/) 前端框架提供完整的后端服务支持。
+基于 Express.js 和 MongoDB 的后台管理系统后端接口模板，为前端框架提供完整的后端服务支持。
 
 ## 项目概述
 
