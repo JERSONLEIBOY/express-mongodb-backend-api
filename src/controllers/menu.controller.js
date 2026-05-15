@@ -12,22 +12,25 @@ const response = require('../utils/response');
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: type
+ *         name: title
  *         schema:
  *           type: string
- *           enum: [directory, menu, external]
- *         description: 菜单类型
+ *         description: 菜单名称（模糊搜索）
  *       - in: query
- *         name: visible
- *         schema:
- *           type: boolean
- *           default: true
- *         description: 是否可见
- *       - in: query
- *         name: name
+ *         name: path
  *         schema:
  *           type: string
- *         description: 菜单名模糊搜索
+ *         description: 路由路径（模糊搜索）
+ *       - in: query
+ *         name: authority
+ *         schema:
+ *           type: string
+ *         description: 权限标识
+ *       - in: query
+ *         name: parentId
+ *         schema:
+ *           type: integer
+ *         description: 父菜单 ID（0 = 顶级）
  *     responses:
  *       200:
  *         description: 成功获取菜单列表（树形结构）
@@ -48,42 +51,43 @@ const response = require('../utils/response');
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
+const formatMenu = (menu) => ({
+  menuId: menu._id,
+  parentId: menu.parentId ?? 0,
+  title: menu.title,
+  path: menu.path ?? null,
+  component: menu.component ?? null,
+  menuType: menu.menuType ?? 0,
+  sortNumber: menu.sortNumber ?? 0,
+  authority: menu.authority ?? null,
+  icon: menu.icon ?? null,
+  hide: menu.hide ?? 0,
+  meta: menu.meta ?? null,
+  openType: menu.openType ?? null,
+  createTime: menu.createdAt,
+  updateTime: menu.updatedAt,
+  children: null,
+  checked: menu.checked ?? null
+});
+
 const getMenus = async (req, res, next) => {
   try {
-    const { type, visible, name } = req.query;
+    const { title, path, authority, parentId } = req.query;
 
     const query = {};
-
-    if (type) query.type = type;
-    if (visible !== undefined) query.visible = visible === 'true';
-    if (name) query.name = new RegExp(name, 'i');
+    if (title) query.title = new RegExp(title, 'i');
+    if (path) query.path = new RegExp(path, 'i');
+    if (authority) query.authority = authority;
+    if (parentId !== undefined) query.parentId = Number(parentId);
 
     const menus = await Menu.find(query)
-      .populate('parentId', 'name')
-      .sort({ sort: 1, createdAt: -1 })
+      .sort({ sortNumber: 1, createdAt: -1 })
       .lean();
 
-    const tree = buildMenuTree(menus);
-
-    return response.success(res, tree);
+    return response.success(res, menus.map(formatMenu));
   } catch (error) {
     next(error);
   }
-};
-
-const buildMenuTree = (menus, parentId = null) => {
-  return menus
-    .filter(menu => {
-      if (parentId === null) {
-        return menu.parentId === null || menu.parentId === undefined;
-      }
-      return menu.parentId && menu.parentId._id.toString() === parentId.toString();
-    })
-    .map(menu => ({
-      ...menu,
-      children: buildMenuTree(menus, menu._id)
-    }))
-    .sort((a, b) => a.sort - b.sort);
 };
 
 /**
@@ -126,15 +130,13 @@ const getMenuById = async (req, res, next) => {
   try {
     const { id } = req.params;
 
-    const menu = await Menu.findById(id)
-      .populate('parentId', 'name')
-      .lean();
+    const menu = await Menu.findById(id).lean();
 
     if (!menu) {
       return response.notFound(res, '菜单不存在');
     }
 
-    return response.success(res, menu);
+    return response.success(res, formatMenu(menu));
   } catch (error) {
     next(error);
   }
@@ -156,36 +158,34 @@ const getMenuById = async (req, res, next) => {
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               title:
  *                 type: string
  *                 maxLength: 50
  *                 required: true
  *                 description: 菜单名称
- *               type:
- *                 type: string
- *                 enum: [directory, menu, external]
- *                 required: true
- *                 description: 菜单类型
+ *               menuType:
+ *                 type: integer
+ *                 enum: [0, 1, 2]
+ *                 description: 菜单类型（0目录,1菜单,2按钮）
  *               path:
  *                 type: string
  *                 maxLength: 200
  *                 description: 菜单路径
  *               parentId:
- *                 type: string
- *                 format: ObjectId
- *                 description: 父菜单 ID
- *               sort:
+ *                 type: integer
+ *                 description: 父菜单 ID（0=顶级）
+ *               sortNumber:
  *                 type: integer
  *                 default: 0
- *                 description: 排序
+ *                 description: 排序号
  *               icon:
  *                 type: string
  *                 maxLength: 100
  *                 description: 图标
- *               visible:
- *                 type: boolean
- *                 default: true
- *                 description: 是否可见
+ *               hide:
+ *                 type: integer
+ *                 enum: [0, 1]
+ *                 description: 是否隐藏（0否,1是）
  *               component:
  *                 type: string
  *                 maxLength: 200
@@ -194,6 +194,19 @@ const getMenuById = async (req, res, next) => {
  *                 type: string
  *                 maxLength: 200
  *                 description: 重定向地址
+ *               authority:
+ *                 type: string
+ *                 description: 权限标识
+ *               meta:
+ *                 type: string
+ *                 description: 路由元信息
+ *               openType:
+ *                 type: integer
+ *                 description: 打开方式
+ *               checked:
+ *                 type: integer
+ *                 enum: [0, 1]
+ *                 description: 权限树回显选中状态
  *     responses:
  *       201:
  *         description: 菜单创建成功
@@ -223,32 +236,11 @@ const getMenuById = async (req, res, next) => {
  */
 const createMenu = async (req, res, next) => {
   try {
-    const { name, type, path, parentId, sort, icon, visible, component, redirect } = req.body;
+    const { title, menuType, path, parentId, sortNumber, icon, hide, component, redirect, authority, meta, openType, checked } = req.body;
 
-    if (parentId) {
-      const parentMenu = await Menu.findById(parentId);
-      if (!parentMenu) {
-        return response.badRequest(res, '父菜单不存在');
-      }
-    }
+    const menu = await Menu.create({ title, menuType, path, parentId, sortNumber, icon, hide, component, redirect, authority, meta, openType, checked });
 
-    const menu = await Menu.create({
-      name,
-      type,
-      path,
-      parentId,
-      sort,
-      icon,
-      visible,
-      component,
-      redirect
-    });
-
-    const populatedMenu = await Menu.findById(menu._id)
-      .populate('parentId', 'name')
-      .lean();
-
-    return response.created(res, populatedMenu, '菜单创建成功');
+    return response.created(res, formatMenu(menu.toObject()), '菜单创建成功');
   } catch (error) {
     next(error);
   }
@@ -278,32 +270,32 @@ const createMenu = async (req, res, next) => {
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               title:
  *                 type: string
  *                 maxLength: 50
  *                 description: 菜单名称
- *               type:
- *                 type: string
- *                 enum: [directory, menu, external]
- *                 description: 菜单类型
+ *               menuType:
+ *                 type: integer
+ *                 enum: [0, 1, 2]
+ *                 description: 菜单类型（0目录,1菜单,2按钮）
  *               path:
  *                 type: string
  *                 maxLength: 200
  *                 description: 菜单路径
  *               parentId:
- *                 type: string
- *                 format: ObjectId
- *                 description: 父菜单 ID
- *               sort:
  *                 type: integer
- *                 description: 排序
+ *                 description: 父菜单 ID（0=顶级）
+ *               sortNumber:
+ *                 type: integer
+ *                 description: 排序号
  *               icon:
  *                 type: string
  *                 maxLength: 100
  *                 description: 图标
- *               visible:
- *                 type: boolean
- *                 description: 是否可见
+ *               hide:
+ *                 type: integer
+ *                 enum: [0, 1]
+ *                 description: 是否隐藏（0否,1是）
  *               component:
  *                 type: string
  *                 maxLength: 200
@@ -312,6 +304,19 @@ const createMenu = async (req, res, next) => {
  *                 type: string
  *                 maxLength: 200
  *                 description: 重定向地址
+ *               authority:
+ *                 type: string
+ *                 description: 权限标识
+ *               meta:
+ *                 type: string
+ *                 description: 路由元信息
+ *               openType:
+ *                 type: integer
+ *                 description: 打开方式
+ *               checked:
+ *                 type: integer
+ *                 enum: [0, 1]
+ *                 description: 权限树回显选中状态
  *     responses:
  *       200:
  *         description: 菜单更新成功
@@ -338,33 +343,28 @@ const createMenu = async (req, res, next) => {
 const updateMenu = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, type, path, parentId, sort, icon, visible, component, redirect } = req.body;
+    const { title, menuType, path, parentId, sortNumber, icon, hide, component, redirect, authority, meta, openType, checked } = req.body;
 
     const menu = await Menu.findById(id);
-    if (!menu) {
-      return response.notFound(res, '菜单不存在');
-    }
-
-    if (parentId && parentId === id) {
-      return response.badRequest(res, '不能将自己设为父菜单');
-    }
+    if (!menu) return response.notFound(res, '菜单不存在');
 
     const updates = {};
-    if (name !== undefined) updates.name = name;
-    if (type !== undefined) updates.type = type;
+    if (title !== undefined) updates.title = title;
+    if (menuType !== undefined) updates.menuType = menuType;
     if (path !== undefined) updates.path = path;
     if (parentId !== undefined) updates.parentId = parentId;
-    if (sort !== undefined) updates.sort = sort;
+    if (sortNumber !== undefined) updates.sortNumber = sortNumber;
     if (icon !== undefined) updates.icon = icon;
-    if (visible !== undefined) updates.visible = visible;
+    if (hide !== undefined) updates.hide = hide;
     if (component !== undefined) updates.component = component;
     if (redirect !== undefined) updates.redirect = redirect;
+    if (authority !== undefined) updates.authority = authority;
+    if (meta !== undefined) updates.meta = meta;
+    if (openType !== undefined) updates.openType = openType;
+    if (checked !== undefined) updates.checked = checked;
 
-    const updatedMenu = await Menu.findByIdAndUpdate(id, updates, { new: true, runValidators: true })
-      .populate('parentId', 'name')
-      .lean();
-
-    return response.success(res, updatedMenu, '菜单更新成功');
+    const updated = await Menu.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).lean();
+    return response.success(res, formatMenu(updated), '菜单更新成功');
   } catch (error) {
     next(error);
   }

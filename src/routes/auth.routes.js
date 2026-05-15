@@ -55,6 +55,7 @@ router.get('/', (req, res) => {
   res.json({
     message: '认证模块接口列表',
     endpoints: [
+      { method: 'GET', path: '/api/v1/auth/captcha', description: '获取图形验证码' },
       { method: 'POST', path: '/api/v1/auth/login', description: '用户登录' },
       { method: 'POST', path: '/api/v1/auth/logout', description: '用户登出' },
       { method: 'GET', path: '/api/v1/auth/current-user', description: '获取当前用户信息' },
@@ -100,6 +101,58 @@ router.get('/', (req, res) => {
  *               $ref: '#/components/schemas/Error'
  *       500:
  *         $ref: '#/components/schemas/Error'
+ */
+/**
+ * @swagger
+ * /api/v1/auth/captcha:
+ *   get:
+ *     tags: [Authentication]
+ *     summary: 获取图形验证码
+ *     description: 返回 SVG 验证码图片（base64）和 captchaId，登录时需携带
+ *     responses:
+ *       200:
+ *         description: 获取成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               allOf:
+ *                 - $ref: '#/components/schemas/StandardResponse'
+ *                 - type: object
+ *                   properties:
+ *                     data:
+ *                       type: object
+ *                       properties:
+ *                         captchaId:
+ *                           type: string
+ *                           description: 验证码 ID，登录时传入
+ *                         base64:
+ *                           type: string
+ *                           description: SVG 图片 base64 数据
+ */
+router.get('/captcha', authController.getCaptcha);
+
+/**
+ * @swagger
+ * components:
+ *   schemas:
+ *     LoginRequest:
+ *       type: object
+ *       required:
+ *         - username
+ *         - password
+ *         - captchaId
+ *         - captchaCode
+ *       properties:
+ *         username:
+ *           type: string
+ *         password:
+ *           type: string
+ *         captchaId:
+ *           type: string
+ *           description: 从 /captcha 接口获取的验证码 ID
+ *         captchaCode:
+ *           type: string
+ *           description: 用户输入的验证码
  */
 router.post('/login', loginLimiter, authController.login);
 

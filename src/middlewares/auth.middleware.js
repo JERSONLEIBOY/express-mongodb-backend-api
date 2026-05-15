@@ -13,7 +13,7 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.substring(7);
 
     const decoded = verifyToken(token);
-    const user = await User.findById(decoded.userId).populate('roles');
+    const user = await User.findById(decoded.userId).populate({ path: 'roles', populate: { path: 'permissions' } });
 
     if (!user) {
       return response.unauthorized(res, '用户不存在');

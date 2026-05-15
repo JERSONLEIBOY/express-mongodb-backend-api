@@ -1,59 +1,71 @@
 const mongoose = require('mongoose');
 
 const menuSchema = new mongoose.Schema({
-  name: {
+  title: {
     type: String,
     required: true,
     trim: true,
     maxlength: 50
   },
-  type: {
-    type: String,
-    enum: ['directory', 'menu', 'external'],
-    required: true
+  menuType: {
+    type: Number,
+    enum: [0, 1, 2],
+    default: 0
   },
   path: {
     type: String,
     trim: true,
-    maxlength: 200
-  },
-  parentId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Menu',
+    maxlength: 200,
     default: null
   },
-  sort: {
+  parentId: {
+    type: String,
+    default: '0'
+  },
+  sortNumber: {
     type: Number,
     default: 0
   },
   icon: {
     type: String,
-    maxlength: 100
+    maxlength: 100,
+    default: null
   },
-  visible: {
-    type: Boolean,
-    default: true
+  hide: {
+    type: Number,
+    enum: [0, 1],
+    default: 0
   },
   component: {
     type: String,
-    maxlength: 200
+    maxlength: 200,
+    default: null
   },
   redirect: {
     type: String,
-    maxlength: 200
+    maxlength: 200,
+    default: null
+  },
+  authority: {
+    type: String,
+    default: null
+  },
+  meta: {
+    type: String,
+    default: null
+  },
+  openType: {
+    type: Number,
+    default: null
+  },
+  checked: {
+    type: Number,
+    enum: [0, 1],
+    default: null
   }
 }, {
   timestamps: true
 });
 
-menuSchema.pre('find', function() {
-  this.populate('children');
-});
-
-menuSchema.virtual('children', {
-  ref: 'Menu',
-  localField: '_id',
-  foreignField: 'parentId'
-});
 
 module.exports = mongoose.model('Menu', menuSchema);

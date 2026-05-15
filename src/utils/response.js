@@ -8,8 +8,8 @@ const response = {
   },
 
   created: (res, data = null, message = '创建成功') => {
-    return res.status(201).json({
-      code: 201,
+    return res.status(200).json({
+      code: 200,
       message,
       data
     });

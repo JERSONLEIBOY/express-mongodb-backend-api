@@ -1,7 +1,10 @@
+const crypto = require('crypto');
+const svgCaptcha = require('svg-captcha');
 const User = require('../models/User');
 const LoginLog = require('../models/LoginLog');
 const { generateToken } = require('../utils/jwt');
 const response = require('../utils/response');
+const captchaStore = require('../utils/captchaStore');
 
 /**
  * @swagger
@@ -35,9 +38,21 @@ const response = require('../utils/response');
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
+const getCaptcha = (req, res) => {
+  const captcha = svgCaptcha.create({ noise: 2, color: true });
+  const captchaId = crypto.randomUUID();
+  captchaStore.set(captchaId, captcha.text);
+  const base64 = 'data:image/svg+xml;base64,' + Buffer.from(captcha.data).toString('base64');
+  return response.success(res, { captchaId, base64 });
+};
+
 const login = async (req, res, next) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, captchaId, captchaCode } = req.body;
+
+    if (!captchaStore.verify(captchaId, captchaCode)) {
+      return response.badRequest(res, '验证码错误或已过期');
+    }
 
     if (!username || !password) {
       await LoginLog.create({
@@ -180,14 +195,13 @@ const getCurrentUser = async (req, res, next) => {
   try {
     const user = req.user;
 
-    const permissions = user.roles.flatMap(role => {
-      if (role.permissions) {
-        return role.permissions.map(p => p._id.toString());
-      }
-      return [];
+    const seenIds = new Set();
+    const authorities = user.roles.flatMap(role => role.permissions || []).filter(p => {
+      const id = p._id.toString();
+      if (seenIds.has(id)) return false;
+      seenIds.add(id);
+      return true;
     });
-
-    const uniquePermissions = [...new Set(permissions)];
 
     return response.success(res, {
       id: user._id,
@@ -196,8 +210,10 @@ const getCurrentUser = async (req, res, next) => {
       sex: user.sex,
       email: user.email,
       phone: user.phone,
+      birthday: user.birthday,
+      remark: user.remark,
       roles: user.roles,
-      permissions: uniquePermissions,
+      authorities,
       organization: user.organization
     });
   } catch (error) {
@@ -258,6 +274,7 @@ const refreshToken = async (req, res, next) => {
 };
 
 module.exports = {
+  getCaptcha,
   login,
   logout,
   getCurrentUser,

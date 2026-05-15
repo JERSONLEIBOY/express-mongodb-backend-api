@@ -21,22 +21,25 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: type
+ *         name: title
  *         schema:
  *           type: string
- *           enum: [directory, menu, external]
- *         description: 菜单类型
+ *         description: 菜单名称（模糊搜索）
  *       - in: query
- *         name: visible
- *         schema:
- *           type: boolean
- *           default: true
- *         description: 是否可见
- *       - in: query
- *         name: name
+ *         name: path
  *         schema:
  *           type: string
- *         description: 菜单名模糊搜索
+ *         description: 路由路径（模糊搜索）
+ *       - in: query
+ *         name: authority
+ *         schema:
+ *           type: string
+ *         description: 权限标识
+ *       - in: query
+ *         name: parentId
+ *         schema:
+ *           type: integer
+ *         description: 父菜单 ID（0 = 顶级）
  *     responses:
  *       200:
  *         description: 成功获取菜单列表（树形结构）
@@ -57,7 +60,7 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
-router.get('/', menuController.getMenus);
+router.get('/', authenticate, menuController.getMenus);
 
 /**
  * @swagger
@@ -95,7 +98,7 @@ router.get('/', menuController.getMenus);
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
-router.get('/:id', menuController.getMenuById);
+router.get('/:id', authenticate, menuController.getMenuById);
 
 /**
  * @swagger
@@ -113,36 +116,34 @@ router.get('/:id', menuController.getMenuById);
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               title:
  *                 type: string
  *                 maxLength: 50
  *                 required: true
  *                 description: 菜单名称
- *               type:
- *                 type: string
- *                 enum: [directory, menu, external]
- *                 required: true
- *                 description: 菜单类型
+ *               menuType:
+ *                 type: integer
+ *                 enum: [0, 1, 2]
+ *                 description: 菜单类型（0目录,1菜单,2按钮）
  *               path:
  *                 type: string
  *                 maxLength: 200
  *                 description: 菜单路径
  *               parentId:
- *                 type: string
- *                 format: ObjectId
- *                 description: 父菜单 ID
- *               sort:
+ *                 type: integer
+ *                 description: 父菜单 ID（0=顶级）
+ *               sortNumber:
  *                 type: integer
  *                 default: 0
- *                 description: 排序
+ *                 description: 排序号
  *               icon:
  *                 type: string
  *                 maxLength: 100
  *                 description: 图标
- *               visible:
- *                 type: boolean
- *                 default: true
- *                 description: 是否可见
+ *               hide:
+ *                 type: integer
+ *                 enum: [0, 1]
+ *                 description: 是否隐藏（0否,1是）
  *               component:
  *                 type: string
  *                 maxLength: 200
@@ -151,6 +152,19 @@ router.get('/:id', menuController.getMenuById);
  *                 type: string
  *                 maxLength: 200
  *                 description: 重定向地址
+ *               authority:
+ *                 type: string
+ *                 description: 权限标识
+ *               meta:
+ *                 type: string
+ *                 description: 路由元信息
+ *               openType:
+ *                 type: integer
+ *                 description: 打开方式
+ *               checked:
+ *                 type: integer
+ *                 enum: [0, 1]
+ *                 description: 权限树回显选中状态
  *     responses:
  *       201:
  *         description: 菜单创建成功
@@ -178,7 +192,7 @@ router.get('/:id', menuController.getMenuById);
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
-router.post('/', authorize('ADMIN'), menuController.createMenu);
+router.post('/', authenticate, authorize('ADMIN'), menuController.createMenu);
 
 /**
  * @swagger
@@ -204,32 +218,32 @@ router.post('/', authorize('ADMIN'), menuController.createMenu);
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               title:
  *                 type: string
  *                 maxLength: 50
  *                 description: 菜单名称
- *               type:
- *                 type: string
- *                 enum: [directory, menu, external]
- *                 description: 菜单类型
+ *               menuType:
+ *                 type: integer
+ *                 enum: [0, 1, 2]
+ *                 description: 菜单类型（0目录,1菜单,2按钮）
  *               path:
  *                 type: string
  *                 maxLength: 200
  *                 description: 菜单路径
  *               parentId:
- *                 type: string
- *                 format: ObjectId
- *                 description: 父菜单 ID
- *               sort:
  *                 type: integer
- *                 description: 排序
+ *                 description: 父菜单 ID（0=顶级）
+ *               sortNumber:
+ *                 type: integer
+ *                 description: 排序号
  *               icon:
  *                 type: string
  *                 maxLength: 100
  *                 description: 图标
- *               visible:
- *                 type: boolean
- *                 description: 是否可见
+ *               hide:
+ *                 type: integer
+ *                 enum: [0, 1]
+ *                 description: 是否隐藏（0否,1是）
  *               component:
  *                 type: string
  *                 maxLength: 200
@@ -238,6 +252,19 @@ router.post('/', authorize('ADMIN'), menuController.createMenu);
  *                 type: string
  *                 maxLength: 200
  *                 description: 重定向地址
+ *               authority:
+ *                 type: string
+ *                 description: 权限标识
+ *               meta:
+ *                 type: string
+ *                 description: 路由元信息
+ *               openType:
+ *                 type: integer
+ *                 description: 打开方式
+ *               checked:
+ *                 type: integer
+ *                 enum: [0, 1]
+ *                 description: 权限树回显选中状态
  *     responses:
  *       200:
  *         description: 菜单更新成功
@@ -261,7 +288,7 @@ router.post('/', authorize('ADMIN'), menuController.createMenu);
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
-router.put('/:id', authorize('ADMIN'), menuController.updateMenu);
+router.put('/:id', authenticate, authorize('ADMIN'), menuController.updateMenu);
 
 /**
  * @swagger
@@ -309,6 +336,6 @@ router.put('/:id', authorize('ADMIN'), menuController.updateMenu);
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
-router.delete('/:id', authorize('ADMIN'), menuController.deleteMenu);
+router.delete('/:id', authenticate, authorize('ADMIN'), menuController.deleteMenu);
 
 module.exports = router;
