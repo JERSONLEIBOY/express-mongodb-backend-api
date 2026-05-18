@@ -1,38 +1,42 @@
 const mongoose = require('mongoose');
 
 const dictionaryItemSchema = new mongoose.Schema({
-  dictionaryCode: {
+  dictId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: 'Dictionary',
+    required: true
+  },
+  dictCode: {
     type: String,
     required: true,
     trim: true,
     lowercase: true,
     index: true
   },
-  label: {
+  dictDataName: {
     type: String,
     required: true,
     trim: true,
     maxlength: 100
   },
-  value: {
+  dictDataCode: {
     type: String,
     required: true,
     trim: true,
     maxlength: 100
   },
-  sort: {
+  sortNumber: {
     type: Number,
     default: 0
   },
-  status: {
+  comments: {
     type: String,
-    enum: ['active', 'inactive'],
-    default: 'active'
+    trim: true
   }
 }, {
   timestamps: true
 });
 
-dictionaryItemSchema.index({ dictionaryCode: 1, value: 1 }, { unique: true });
+dictionaryItemSchema.index({ dictCode: 1, dictDataCode: 1 }, { unique: true });
 
 module.exports = mongoose.model('DictionaryItem', dictionaryItemSchema);

@@ -176,26 +176,23 @@ const createMenus = async () => {
 
 const createOrganizations = async () => {
   const company = await Organization.create({
-    name: '总公司',
-    type: 'company',
-    sort: 1,
-    status: 'active'
+    organizationName: '总公司',
+    organizationType: 'company',
+    sortNumber: 1
   });
 
   const techDept = await Organization.create({
-    name: '技术部',
-    type: 'department',
-    parentId: company._id,
-    sort: 1,
-    status: 'active'
+    organizationName: '技术部',
+    organizationType: 'department',
+    parentId: company._id.toString(),
+    sortNumber: 1
   });
 
   const devTeam = await Organization.create({
-    name: '开发组',
-    type: 'team',
-    parentId: techDept._id,
-    sort: 1,
-    status: 'active'
+    organizationName: '开发组',
+    organizationType: 'team',
+    parentId: techDept._id.toString(),
+    sortNumber: 1
   });
 
   logger.info('Created organization structure');
@@ -204,39 +201,38 @@ const createOrganizations = async () => {
 
 const createDictionaries = async () => {
   const sexDict = await Dictionary.create({
-    name: '性别',
-    code: 'sex',
-    status: 'active'
+    dictName: '用户性别',
+    dictCode: 'sex',
+    sortNumber: 1
   });
 
   await DictionaryItem.insertMany([
-    { dictionaryCode: 'sex', label: '男', value: 'male', sort: 1, status: 'active' },
-    { dictionaryCode: 'sex', label: '女', value: 'female', sort: 2, status: 'active' },
-    { dictionaryCode: 'sex', label: '未知', value: 'unknown', sort: 3, status: 'active' }
+    { dictId: sexDict._id, dictCode: 'sex', dictDataName: '男', dictDataCode: '1', sortNumber: 1 },
+    { dictId: sexDict._id, dictCode: 'sex', dictDataName: '女', dictDataCode: '2', sortNumber: 2 }
   ]);
 
   const orgTypeDict = await Dictionary.create({
-    name: '机构类型',
-    code: 'organization_type',
-    status: 'active'
+    dictName: '机构类型',
+    dictCode: 'organization_type',
+    sortNumber: 2
   });
 
   await DictionaryItem.insertMany([
-    { dictionaryCode: 'organization_type', label: '公司', value: 'company', sort: 1, status: 'active' },
-    { dictionaryCode: 'organization_type', label: '部门', value: 'department', sort: 2, status: 'active' },
-    { dictionaryCode: 'organization_type', label: '小组', value: 'team', sort: 3, status: 'active' }
+    { dictId: orgTypeDict._id, dictCode: 'organization_type', dictDataName: '公司', dictDataCode: '1', sortNumber: 1 },
+    { dictId: orgTypeDict._id, dictCode: 'organization_type', dictDataName: '部门', dictDataCode: '2', sortNumber: 2 },
+    { dictId: orgTypeDict._id, dictCode: 'organization_type', dictDataName: '小组', dictDataCode: '3', sortNumber: 3 }
   ]);
 
   const statusDict = await Dictionary.create({
-    name: '状态',
-    code: 'status',
-    status: 'active'
+    dictName: '状态',
+    dictCode: 'status',
+    sortNumber: 3
   });
 
   await DictionaryItem.insertMany([
-    { dictionaryCode: 'status', label: '正常', value: 'active', sort: 1, status: 'active' },
-    { dictionaryCode: 'status', label: '停用', value: 'inactive', sort: 2, status: 'active' },
-    { dictionaryCode: 'status', label: '锁定', value: 'locked', sort: 3, status: 'active' }
+    { dictId: statusDict._id, dictCode: 'status', dictDataName: '正常', dictDataCode: '1', sortNumber: 1 },
+    { dictId: statusDict._id, dictCode: 'status', dictDataName: '停用', dictDataCode: '2', sortNumber: 2 },
+    { dictId: statusDict._id, dictCode: 'status', dictDataName: '锁定', dictDataCode: '3', sortNumber: 3 }
   ]);
 
   logger.info('Created dictionaries and items');
@@ -247,7 +243,7 @@ const createUsers = async (roles, organizations) => {
   const adminRole = roles.find(r => r.code === 'ADMIN');
   const userRole = roles.find(r => r.code === 'USER');
   const guestRole = roles.find(r => r.code === 'GUEST');
-  const devTeam = organizations.find(o => o.name === '开发组');
+  const devTeam = organizations.find(o => o.organizationName === '开发组');
 
   const hashedAdminPassword = await bcrypt.hash('admin123', 10);
   const hashedTestPassword = await bcrypt.hash('test123', 10);

@@ -44,7 +44,15 @@
       "mcp__chrome-devtools__evaluate_script",
       "mcp__chrome-devtools__get_network_request",
       "mcp__chrome-devtools__select_page",
-      "mcp__chrome-devtools__navigate_page"
+      "mcp__chrome-devtools__navigate_page",
+      "Bash(grep -E \"\\\\.js$\")",
+      "Bash(npm run *)",
+      "Bash(python -m json.tool)",
+      "mcp__chrome-devtools__click",
+      "Bash(cmd.exe *)",
+      "Bash(powershell *)",
+      "Bash(grep -v \"^$\")",
+      "Bash(mongosh ele_admin --eval ' *)"
     ]
   }
 }

@@ -1,39 +1,36 @@
 const mongoose = require('mongoose');
 
 const organizationSchema = new mongoose.Schema({
-  name: {
+  organizationName: {
     type: String,
     required: true,
     trim: true,
     maxlength: 100
   },
-  type: {
+  organizationFullName: {
     type: String,
-    enum: ['company', 'department', 'team'],
-    default: 'team'
+    trim: true
+  },
+  organizationCode: {
+    type: String,
+    trim: true
+  },
+  organizationType: {
+    type: String
   },
   parentId: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Organization',
-    default: null
+    type: String,
+    default: '0'
   },
-  sort: {
+  sortNumber: {
     type: Number,
     default: 0
   },
-  status: {
-    type: String,
-    enum: ['active', 'inactive'],
-    default: 'active'
+  comments: {
+    type: String
   }
 }, {
   timestamps: true
-});
-
-organizationSchema.virtual('children', {
-  ref: 'Organization',
-  localField: '_id',
-  foreignField: 'parentId'
 });
 
 module.exports = mongoose.model('Organization', organizationSchema);

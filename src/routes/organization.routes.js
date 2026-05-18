@@ -21,22 +21,20 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: type
+ *         name: organizationName
  *         schema:
  *           type: string
- *           enum: [company, department, team]
- *         description: 组织类型
+ *         description: 机构名称（模糊搜索）
  *       - in: query
- *         name: status
+ *         name: organizationFullName
  *         schema:
  *           type: string
- *           enum: [active, inactive]
- *         description: 组织状态
+ *         description: 机构全称（模糊搜索）
  *       - in: query
- *         name: name
+ *         name: organizationType
  *         schema:
  *           type: string
- *         description: 组织名模糊搜索
+ *         description: 机构类型（字典值）
  *     responses:
  *       200:
  *         description: 成功获取组织列表（树形结构）
@@ -49,7 +47,6 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
  *                   properties:
  *                     data:
  *                       type: array
- *                       description: 组织树形结构
  *                       items:
  *                         $ref: '#/components/schemas/Organization'
  *       401:
@@ -57,7 +54,7 @@ const { authenticate, authorize } = require('../middlewares/auth.middleware');
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
-router.get('/', organizationController.getOrganizations);
+router.get('/', authenticate, organizationController.getOrganizations);
 
 /**
  * @swagger
@@ -65,7 +62,6 @@ router.get('/', organizationController.getOrganizations);
  *   get:
  *     tags: [Organizations]
  *     summary: 获取单个组织信息
- *     description: 根据 ID 获取组织的详细信息
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -74,7 +70,6 @@ router.get('/', organizationController.getOrganizations);
  *         required: true
  *         schema:
  *           type: string
- *           format: ObjectId
  *         description: 组织 ID
  *     responses:
  *       200:
@@ -95,7 +90,7 @@ router.get('/', organizationController.getOrganizations);
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
-router.get('/:id', organizationController.getOrganizationById);
+router.get('/:id', authenticate, organizationController.getOrganizationById);
 
 /**
  * @swagger
@@ -103,7 +98,7 @@ router.get('/:id', organizationController.getOrganizationById);
  *   post:
  *     tags: [Organizations]
  *     summary: 创建组织
- *     description: 创建新组织，仅限管理员操作
+ *     description: 仅限管理员操作
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -112,34 +107,36 @@ router.get('/:id', organizationController.getOrganizationById);
  *         application/json:
  *           schema:
  *             type: object
+ *             required:
+ *               - organizationName
  *             properties:
- *               name:
+ *               organizationName:
  *                 type: string
  *                 maxLength: 100
- *                 required: true
- *                 description: 组织名称
- *               type:
+ *                 description: 机构名称
+ *               organizationFullName:
  *                 type: string
- *                 enum: [company, department, team]
- *                 default: team
- *                 description: 组织类型
+ *                 description: 机构全称
+ *               organizationCode:
+ *                 type: string
+ *                 description: 机构代码
+ *               organizationType:
+ *                 type: string
+ *                 description: 机构类型（字典值）
  *               parentId:
  *                 type: string
- *                 format: ObjectId
- *                 default: null
- *                 description: 父组织 ID
- *               sort:
+ *                 default: '0'
+ *                 description: 上级机构 ID，0 表示顶级
+ *               sortNumber:
  *                 type: integer
  *                 default: 0
- *                 description: 排序
- *               status:
+ *                 description: 排序号
+ *               comments:
  *                 type: string
- *                 enum: [active, inactive]
- *                 default: active
- *                 description: 组织状态
+ *                 description: 备注
  *     responses:
  *       201:
- *         description: 组织创建成功
+ *         description: 机构创建成功
  *         content:
  *           application/json:
  *             schema:
@@ -149,12 +146,6 @@ router.get('/:id', organizationController.getOrganizationById);
  *                   properties:
  *                     data:
  *                       $ref: '#/components/schemas/Organization'
- *                     code:
- *                       type: integer
- *                       example: 201
- *                     message:
- *                       type: string
- *                       example: '组织创建成功'
  *       400:
  *         $ref: '#/components/schemas/Error'
  *       401:
@@ -164,7 +155,7 @@ router.get('/:id', organizationController.getOrganizationById);
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
-router.post('/', authorize('ADMIN'), organizationController.createOrganization);
+router.post('/', authenticate, authorize('ADMIN'), organizationController.createOrganization);
 
 /**
  * @swagger
@@ -172,7 +163,7 @@ router.post('/', authorize('ADMIN'), organizationController.createOrganization);
  *   put:
  *     tags: [Organizations]
  *     summary: 更新组织信息
- *     description: 更新指定组织的信息，仅限管理员操作
+ *     description: 仅限管理员操作
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -181,7 +172,6 @@ router.post('/', authorize('ADMIN'), organizationController.createOrganization);
  *         required: true
  *         schema:
  *           type: string
- *           format: ObjectId
  *         description: 组织 ID
  *     requestBody:
  *       required: true
@@ -190,28 +180,31 @@ router.post('/', authorize('ADMIN'), organizationController.createOrganization);
  *           schema:
  *             type: object
  *             properties:
- *               name:
+ *               organizationName:
  *                 type: string
  *                 maxLength: 100
- *                 description: 组织名称
- *               type:
+ *                 description: 机构名称
+ *               organizationFullName:
  *                 type: string
- *                 enum: [company, department, team]
- *                 description: 组织类型
+ *                 description: 机构全称
+ *               organizationCode:
+ *                 type: string
+ *                 description: 机构代码
+ *               organizationType:
+ *                 type: string
+ *                 description: 机构类型（字典值）
  *               parentId:
  *                 type: string
- *                 format: ObjectId
- *                 description: 父组织 ID
- *               sort:
+ *                 description: 上级机构 ID
+ *               sortNumber:
  *                 type: integer
- *                 description: 排序
- *               status:
+ *                 description: 排序号
+ *               comments:
  *                 type: string
- *                 enum: [active, inactive]
- *                 description: 组织状态
+ *                 description: 备注
  *     responses:
  *       200:
- *         description: 组织更新成功
+ *         description: 机构更新成功
  *         content:
  *           application/json:
  *             schema:
@@ -232,7 +225,7 @@ router.post('/', authorize('ADMIN'), organizationController.createOrganization);
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
-router.put('/:id', authorize('ADMIN'), organizationController.updateOrganization);
+router.put('/:id', authenticate, authorize('ADMIN'), organizationController.updateOrganization);
 
 /**
  * @swagger
@@ -240,7 +233,7 @@ router.put('/:id', authorize('ADMIN'), organizationController.updateOrganization
  *   delete:
  *     tags: [Organizations]
  *     summary: 删除组织
- *     description: 删除指定组织，不能删除有子组织的组织，仅限管理员操作
+ *     description: 不能删除有子组织的组织，仅限管理员操作
  *     security:
  *       - bearerAuth: []
  *     parameters:
@@ -249,26 +242,14 @@ router.put('/:id', authorize('ADMIN'), organizationController.updateOrganization
  *         required: true
  *         schema:
  *           type: string
- *           format: ObjectId
  *         description: 组织 ID
  *     responses:
- *       204:
- *         description: 组织删除成功
+ *       200:
+ *         description: 机构删除成功
  *         content:
  *           application/json:
  *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: null
- *                     code:
- *                       type: integer
- *                       example: 204
- *                     message:
- *                       type: string
- *                       example: '组织删除成功'
+ *               $ref: '#/components/schemas/StandardResponse'
  *       400:
  *         $ref: '#/components/schemas/Error'
  *       401:
@@ -280,6 +261,6 @@ router.put('/:id', authorize('ADMIN'), organizationController.updateOrganization
  *       500:
  *         $ref: '#/components/schemas/Error'
  */
-router.delete('/:id', authorize('ADMIN'), organizationController.deleteOrganization);
+router.delete('/:id', authenticate, authorize('ADMIN'), organizationController.deleteOrganization);
 
 module.exports = router;
