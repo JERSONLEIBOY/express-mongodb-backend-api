@@ -1,75 +1,184 @@
 const Organization = require('../models/Organization');
 const response = require('../utils/response');
 
+const formatOrg = (org) => ({
+  organizationId: org._id,
+  parentId: org.parentId ?? '0',
+  organizationName: org.organizationName,
+  organizationFullName: org.organizationFullName ?? null,
+  organizationCode: org.organizationCode ?? null,
+  organizationType: org.organizationType ?? null,
+  sortNumber: org.sortNumber,
+  comments: org.comments ?? null,
+  createTime: org.createdAt
+});
+
+const buildQuery = ({ organizationName, organizationFullName, organizationType }) => {
+  const query = {};
+  if (organizationName) query.organizationName = new RegExp(organizationName, 'i');
+  if (organizationFullName) query.organizationFullName = new RegExp(organizationFullName, 'i');
+  if (organizationType) query.organizationType = organizationType;
+  return query;
+};
+
+/**
+ * @swagger
+ * /api/v1/organizations/page:
+ *   get:
+ *     tags: [Organizations]
+ *     summary: 分页查询机构
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *       - in: query
+ *         name: organizationName
+ *         schema: { type: string }
+ *       - in: query
+ *         name: organizationFullName
+ *         schema: { type: string }
+ *       - in: query
+ *         name: organizationType
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+const getOrganizationsPage = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, ...filters } = req.query;
+    const query = buildQuery(filters);
+    const skip = (Number(page) - 1) * Number(limit);
+    const [list, count] = await Promise.all([
+      Organization.find(query).sort({ sortNumber: 1 }).skip(skip).limit(Number(limit)).lean(),
+      Organization.countDocuments(query)
+    ]);
+    return response.success(res, { list: list.map(formatOrg), count });
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @swagger
+ * /api/v1/organizations:
+ *   get:
+ *     tags: [Organizations]
+ *     summary: 查询机构列表（树形）
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: organizationName
+ *         schema: { type: string }
+ *       - in: query
+ *         name: organizationFullName
+ *         schema: { type: string }
+ *       - in: query
+ *         name: organizationType
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
 const getOrganizations = async (req, res, next) => {
   try {
-    const { organizationName, organizationFullName, organizationType } = req.query;
-
-    const query = {};
-    if (organizationName) query.organizationName = new RegExp(organizationName, 'i');
-    if (organizationFullName) query.organizationFullName = new RegExp(organizationFullName, 'i');
-    if (organizationType) query.organizationType = organizationType;
-
-    const organizations = await Organization.find(query)
-      .sort({ sortNumber: 1, createdAt: -1 })
-      .lean();
-
-    const tree = buildOrganizationTree(organizations);
-    return response.success(res, tree);
+    const orgs = await Organization.find(buildQuery(req.query)).sort({ sortNumber: 1 }).lean();
+    return response.success(res, orgs.map(formatOrg));
   } catch (error) {
     next(error);
   }
 };
 
-const buildOrganizationTree = (organizations, parentId = '0') => {
-  return organizations
-    .filter(org => (org.parentId || '0') === parentId)
-    .map(org => ({
-      ...org,
-      organizationId: org._id,
-      children: buildOrganizationTree(organizations, org._id.toString())
-    }))
-    .sort((a, b) => a.sortNumber - b.sortNumber);
-};
-
-const getOrganizationById = async (req, res, next) => {
-  try {
-    const organization = await Organization.findById(req.params.id).lean();
-    if (!organization) return response.notFound(res, '机构不存在');
-    return response.success(res, { ...organization, organizationId: organization._id });
-  } catch (error) {
-    next(error);
-  }
-};
-
+/**
+ * @swagger
+ * /api/v1/organizations:
+ *   post:
+ *     tags: [Organizations]
+ *     summary: 添加机构
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [organizationName]
+ *             properties:
+ *               organizationName: { type: string }
+ *               organizationFullName: { type: string }
+ *               organizationCode: { type: string }
+ *               organizationType: { type: string }
+ *               parentId: { type: string, default: '0' }
+ *               sortNumber: { type: integer }
+ *               comments: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
 const createOrganization = async (req, res, next) => {
   try {
     const { organizationName, organizationFullName, organizationCode, organizationType, parentId, sortNumber, comments } = req.body;
 
     if (parentId && parentId !== '0') {
-      const parentOrg = await Organization.findById(parentId);
-      if (!parentOrg) return response.badRequest(res, '父机构不存在');
+      const parent = await Organization.findById(parentId).lean();
+      if (!parent) return response.badRequest(res, '父机构不存在');
     }
 
-    const organization = await Organization.create({
+    const org = await Organization.create({
       organizationName, organizationFullName, organizationCode,
       organizationType, parentId: parentId || '0', sortNumber, comments
     });
 
-    return response.created(res, { ...organization.toObject(), organizationId: organization._id }, '机构创建成功');
+    return response.created(res, formatOrg(org.toObject()), '机构创建成功');
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * @swagger
+ * /api/v1/organizations/{id}:
+ *   put:
+ *     tags: [Organizations]
+ *     summary: 修改机构
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               organizationName: { type: string }
+ *               organizationFullName: { type: string }
+ *               organizationCode: { type: string }
+ *               organizationType: { type: string }
+ *               parentId: { type: string }
+ *               sortNumber: { type: integer }
+ *               comments: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
 const updateOrganization = async (req, res, next) => {
   try {
     const { id } = req.params;
     const { organizationName, organizationFullName, organizationCode, organizationType, parentId, sortNumber, comments } = req.body;
 
-    const organization = await Organization.findById(id);
-    if (!organization) return response.notFound(res, '机构不存在');
-
+    if (!await Organization.findById(id).lean()) return response.notFound(res, '机构不存在');
     if (parentId && parentId === id) return response.badRequest(res, '不能将自己设为父机构');
 
     const updates = {};
@@ -82,22 +191,34 @@ const updateOrganization = async (req, res, next) => {
     if (comments !== undefined) updates.comments = comments;
 
     const updated = await Organization.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).lean();
-    return response.success(res, { ...updated, organizationId: updated._id }, '机构更新成功');
+    return response.success(res, formatOrg(updated), '机构更新成功');
   } catch (error) {
     next(error);
   }
 };
 
+/**
+ * @swagger
+ * /api/v1/organizations/{id}:
+ *   delete:
+ *     tags: [Organizations]
+ *     summary: 删除机构
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
 const deleteOrganization = async (req, res, next) => {
   try {
     const { id } = req.params;
-
-    const organization = await Organization.findById(id);
-    if (!organization) return response.notFound(res, '机构不存在');
-
-    const childOrgs = await Organization.find({ parentId: id });
-    if (childOrgs.length > 0) return response.badRequest(res, '存在子机构，无法删除');
-
+    if (!await Organization.findById(id).lean()) return response.notFound(res, '机构不存在');
+    if (await Organization.countDocuments({ parentId: id })) return response.badRequest(res, '存在子机构，无法删除');
     await Organization.findByIdAndDelete(id);
     return response.success(res, null, '机构删除成功');
   } catch (error) {
@@ -106,8 +227,8 @@ const deleteOrganization = async (req, res, next) => {
 };
 
 module.exports = {
+  getOrganizationsPage,
   getOrganizations,
-  getOrganizationById,
   createOrganization,
   updateOrganization,
   deleteOrganization

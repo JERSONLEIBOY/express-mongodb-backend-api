@@ -1,9 +1,56 @@
+const RESPONSE_TIME_ZONE = process.env.RESPONSE_TIME_ZONE || 'Asia/Shanghai';
+
+const dateTimeFormatter = new Intl.DateTimeFormat('en-CA', {
+  timeZone: RESPONSE_TIME_ZONE,
+  year: 'numeric',
+  month: '2-digit',
+  day: '2-digit',
+  hour: '2-digit',
+  minute: '2-digit',
+  second: '2-digit',
+  hour12: false,
+  hourCycle: 'h23'
+});
+
+const formatDateTime = (date) => {
+  const parts = dateTimeFormatter.formatToParts(date).reduce((acc, part) => {
+    acc[part.type] = part.value;
+    return acc;
+  }, {});
+
+  return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`;
+};
+
+const isObjectId = (value) => {
+  return value && typeof value.toHexString === 'function' && value._bsontype === 'ObjectId';
+};
+
+const normalizeData = (data, seen = new WeakSet()) => {
+  if (data === null || data === undefined) return data;
+  if (data instanceof Date) return formatDateTime(data);
+  if (isObjectId(data)) return data.toString();
+  if (Array.isArray(data)) return data.map(item => normalizeData(item, seen));
+  if (typeof data !== 'object') return data;
+
+  const source = typeof data.toObject === 'function' ? data.toObject() : data;
+  if (source instanceof Date) return formatDateTime(source);
+  if (isObjectId(source)) return source.toString();
+
+  if (seen.has(source)) return source;
+  seen.add(source);
+
+  return Object.keys(source).reduce((acc, key) => {
+    acc[key] = normalizeData(source[key], seen);
+    return acc;
+  }, {});
+};
+
 const response = {
   success: (res, data = null, message = '操作成功') => {
     return res.status(200).json({
       code: 200,
       message,
-      data
+      data: normalizeData(data)
     });
   },
 
@@ -11,7 +58,7 @@ const response = {
     return res.status(200).json({
       code: 200,
       message,
-      data
+      data: normalizeData(data)
     });
   },
 
@@ -67,7 +114,7 @@ const response = {
       code: 200,
       message: '查询成功',
       data: {
-        list,
+        list: normalizeData(list),
         pagination: {
           total,
           page: parseInt(page, 10),

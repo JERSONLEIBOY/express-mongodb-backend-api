@@ -122,6 +122,66 @@ const getDictionaryDataPage = async (req, res, next) => {
 
 /**
  * @swagger
+ * /api/v1/dictionaries/data:
+ *   get:
+ *     tags: [Dictionaries]
+ *     summary: 查询字典数据（支持关键字、名称、编码、字典标识/ID及分页）
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: keywords
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: dictDataName
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: dictDataCode
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: dictCode
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: dictId
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+const getDictionaryDataByCode = async (req, res, next) => {
+  try {
+    const { keywords, dictDataName, dictDataCode, dictCode, dictId } = req.query;
+
+    const query = {};
+
+    if (dictId) {
+      query.dictId = dictId;
+    } else if (dictCode) {
+      query.dictCode = String(dictCode).toLowerCase();
+    }
+
+    if (keywords) {
+      const kw = new RegExp(keywords, 'i');
+      query.$or = [{ dictDataName: kw }, { dictDataCode: kw }];
+    } else {
+      if (dictDataName) query.dictDataName = new RegExp(dictDataName, 'i');
+      if (dictDataCode) query.dictDataCode = new RegExp(dictDataCode, 'i');
+    }
+
+    const items = await DictionaryItem.find(query).sort({ sortNumber: 1 }).lean();
+    return response.success(res, items.map(item => formatItem(item, null)));
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @swagger
  * /api/v1/dictionaries:
  *   post:
  *     tags: [Dictionaries]
@@ -420,6 +480,7 @@ const deleteDictionaryItemBatch = async (req, res, next) => {
 module.exports = {
   getDictionaries,
   getDictionaryDataPage,
+  getDictionaryDataByCode,
   createDictionary,
   updateDictionary,
   deleteDictionary,

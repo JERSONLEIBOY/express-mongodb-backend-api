@@ -187,6 +187,7 @@ express_mongoodb/
 |------|------|------|
 | GET | `/api/v1/dictionaries` | 获取字典分类列表 |
 | GET | `/api/v1/dictionaries/:code/items` | 获取字典项列表 |
+| GET | `/api/v1/dictionaries/data?dictCode=organization_type` | 通过字典编码获取字典数据 |
 | POST | `/api/v1/dictionaries` | 创建字典分类 |
 | PUT | `/api/v1/dictionaries/:id` | 更新字典分类 |
 | DELETE | `/api/v1/dictionaries/:id` | 删除字典分类 |

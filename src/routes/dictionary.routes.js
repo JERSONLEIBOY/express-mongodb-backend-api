@@ -7,13 +7,14 @@ router.use(authenticate);
 
 router.get('/', dictionaryController.getDictionaries);
 router.get('/data/page', dictionaryController.getDictionaryDataPage);
+router.get('/data', dictionaryController.getDictionaryDataByCode);
 router.post('/', authorize('ADMIN'), dictionaryController.createDictionary);
-router.put('/:id', authorize('ADMIN'), dictionaryController.updateDictionary);
-router.delete('/:id', authorize('ADMIN'), dictionaryController.deleteDictionary);
 router.post('/data', authorize('ADMIN'), dictionaryController.createDictionaryItem);
 router.put('/data/:itemId', authorize('ADMIN'), dictionaryController.updateDictionaryItem);
 router.delete('/data/:itemId', authorize('ADMIN'), dictionaryController.deleteDictionaryItem);
 router.delete('/data', authorize('ADMIN'), dictionaryController.deleteDictionaryItemBatch);
+router.put('/:id', authorize('ADMIN'), dictionaryController.updateDictionary);
+router.delete('/:id', authorize('ADMIN'), dictionaryController.deleteDictionary);
 
 /**
  * @swagger
@@ -57,6 +58,21 @@ router.delete('/data', authorize('ADMIN'), dictionaryController.deleteDictionary
  *         schema:
  *           type: integer
  *           default: 20
+ *     responses:
+ *       200:
+ *         description: 成功
+ * /api/v1/dictionaries/data:
+ *   get:
+ *     tags: [Dictionaries]
+ *     summary: 通过字典编码获取字典数据
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: dictCode
+ *         required: true
+ *         schema:
+ *           type: string
  *     responses:
  *       200:
  *         description: 成功
