@@ -52,7 +52,8 @@
       "Bash(cmd.exe *)",
       "Bash(powershell *)",
       "Bash(grep -v \"^$\")",
-      "Bash(mongosh ele_admin --eval ' *)"
+      "Bash(mongosh ele_admin --eval ' *)",
+      "Bash(npm list *)"
     ]
   }
 }

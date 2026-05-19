@@ -13,7 +13,7 @@ const authenticate = async (req, res, next) => {
     const token = authHeader.substring(7);
 
     const decoded = verifyToken(token);
-    const user = await User.findById(decoded.userId).populate({ path: 'roles', populate: { path: 'permissions' } });
+    const user = await User.findById(decoded.userId).populate('roles');
 
     if (!user) {
       return response.unauthorized(res, '用户不存在');
@@ -40,7 +40,7 @@ const authorize = (...allowedRoles) => {
       return response.unauthorized(res, '请先登录');
     }
 
-    const userRoles = req.user.roles.map(role => role.code);
+    const userRoles = req.user.roles.map(role => role.roleCode);
 
     const hasPermission = allowedRoles.some(role => userRoles.includes(role));
 

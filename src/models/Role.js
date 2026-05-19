@@ -1,32 +1,27 @@
 const mongoose = require('mongoose');
 
 const roleSchema = new mongoose.Schema({
-  name: {
+  roleName: {
     type: String,
     required: true,
     trim: true,
     maxlength: 50
   },
-  code: {
+  roleCode: {
     type: String,
     required: true,
     unique: true,
     trim: true,
     uppercase: true
   },
-  remark: {
+  comments: {
     type: String,
     maxlength: 500
   },
-  permissions: [{
+  menus: [{
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Menu'
-  }],
-  status: {
-    type: String,
-    enum: ['active', 'inactive'],
-    default: 'active'
-  }
+  }]
 }, {
   timestamps: true
 });

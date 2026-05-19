@@ -3,139 +3,68 @@ const router = express.Router();
 const roleController = require('../controllers/role.controller');
 const { authenticate, authorize } = require('../middlewares/auth.middleware');
 
+router.use(authenticate);
+
 /**
  * @swagger
- * tags:
- *   name: Roles
- *   description: 角色管理接口
+ * /api/v1/roles/page:
+ *   get:
+ *     tags: [Roles]
+ *     summary: 分页查询角色
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *       - in: query
+ *         name: roleName
+ *         schema: { type: string }
+ *       - in: query
+ *         name: roleCode
+ *         schema: { type: string }
+ *       - in: query
+ *         name: comments
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
  */
+router.get('/page', roleController.getRolesPage);
 
 /**
  * @swagger
  * /api/v1/roles:
  *   get:
  *     tags: [Roles]
- *     summary: 获取角色列表
- *     description: 分页获取角色列表，支持查询过滤、排序功能
+ *     summary: 查询角色列表
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *         description: 页码
+ *         name: roleName
+ *         schema: { type: string }
  *       - in: query
- *         name: pageSize
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 100
- *           default: 20
- *         description: 每页数量
+ *         name: roleCode
+ *         schema: { type: string }
  *       - in: query
- *         name: name
- *         schema:
- *           type: string
- *         description: 角色名模糊搜索
- *       - in: query
- *         name: code
- *         schema:
- *           type: string
- *         description: 角色代码模糊搜索
- *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [active, inactive]
- *         description: 角色状态
- *       - in: query
- *         name: sortField
- *         schema:
- *           type: string
- *           default: createdAt
- *           enum: [name, code, createdAt, updatedAt]
- *         description: 排序字段
- *       - in: query
- *         name: sortOrder
- *         schema:
- *           type: string
- *           default: desc
- *           enum: [asc, desc]
- *         description: 排序方式
+ *         name: comments
+ *         schema: { type: string }
  *     responses:
  *       200:
- *         description: 成功获取角色列表
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: object
- *                       properties:
- *                         list:
- *                           type: array
- *                           items:
- *                             $ref: '#/components/schemas/Role'
- *                         pagination:
- *                           $ref: '#/components/schemas/Pagination'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *         description: 成功
  */
 router.get('/', roleController.getRoles);
-
-/**
- * @swagger
- * /api/v1/roles/{id}:
- *   get:
- *     tags: [Roles]
- *     summary: 获取单个角色信息
- *     description: 根据 ID 获取角色的详细信息，包含权限信息
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 角色 ID
- *     responses:
- *       200:
- *         description: 成功获取角色信息
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/Role'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
- */
-router.get('/:id', roleController.getRoleById);
 
 /**
  * @swagger
  * /api/v1/roles:
  *   post:
  *     tags: [Roles]
- *     summary: 创建角色
- *     description: 创建新角色，仅限管理员操作
+ *     summary: 添加角色
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -143,53 +72,53 @@ router.get('/:id', roleController.getRoleById);
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/CreateRoleRequest'
+ *             type: object
+ *             required: [roleName, roleCode]
+ *             properties:
+ *               roleName: { type: string }
+ *               roleCode: { type: string }
+ *               comments: { type: string }
  *     responses:
- *       201:
- *         description: 角色创建成功
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/Role'
- *                     code:
- *                       type: integer
- *                       example: 201
- *                     message:
- *                       type: string
- *                       example: '角色创建成功'
- *       400:
- *         $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *       200:
+ *         description: 成功
  */
 router.post('/', authorize('ADMIN'), roleController.createRole);
+
+/**
+ * @swagger
+ * /api/v1/roles/batch:
+ *   delete:
+ *     tags: [Roles]
+ *     summary: 批量删除角色
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: array
+ *             items:
+ *               type: string
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.delete('/batch', authorize('ADMIN'), roleController.deleteRoleBatch);
 
 /**
  * @swagger
  * /api/v1/roles/{id}:
  *   put:
  *     tags: [Roles]
- *     summary: 更新角色信息
- *     description: 更新指定角色的信息，仅限管理员操作
+ *     summary: 修改角色
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 角色 ID
+ *         schema: { type: string }
  *     requestBody:
  *       required: true
  *       content:
@@ -197,46 +126,11 @@ router.post('/', authorize('ADMIN'), roleController.createRole);
  *           schema:
  *             type: object
  *             properties:
- *               name:
- *                 type: string
- *                 maxLength: 50
- *                 description: 角色名称
- *               remark:
- *                 type: string
- *                 maxLength: 500
- *                 description: 备注
- *               permissions:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: ObjectId
- *                 description: 权限 ID 列表
- *               status:
- *                 type: string
- *                 enum: [active, inactive]
- *                 description: 角色状态
+ *               roleName: { type: string }
+ *               comments: { type: string }
  *     responses:
  *       200:
- *         description: 角色更新成功
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/Role'
- *       400:
- *         $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *         description: 成功
  */
 router.put('/:id', authorize('ADMIN'), roleController.updateRole);
 
@@ -246,103 +140,63 @@ router.put('/:id', authorize('ADMIN'), roleController.updateRole);
  *   delete:
  *     tags: [Roles]
  *     summary: 删除角色
- *     description: 删除指定角色，不能删除管理员角色，仅限管理员操作
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 角色 ID
+ *         schema: { type: string }
  *     responses:
- *       204:
- *         description: 角色删除成功
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: null
- *                     code:
- *                       type: integer
- *                       example: 204
- *                     message:
- *                       type: string
- *                       example: '角色删除成功'
- *       400:
- *         $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *       200:
+ *         description: 成功
  */
 router.delete('/:id', authorize('ADMIN'), roleController.deleteRole);
 
 /**
  * @swagger
- * /api/v1/roles/{id}/permissions:
- *   put:
+ * /api/v1/roles/{id}/menus:
+ *   get:
  *     tags: [Roles]
- *     summary: 更新角色权限
- *     description: 批量更新指定角色的权限，仅限管理员操作
+ *     summary: 获取角色分配的菜单
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 角色 ID
+ *         schema: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.get('/:id/menus', roleController.getRoleMenus);
+
+/**
+ * @swagger
+ * /api/v1/roles/{id}/menus:
+ *   put:
+ *     tags: [Roles]
+ *     summary: 修改角色菜单
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: path
+ *         name: id
+ *         required: true
+ *         schema: { type: string }
  *     requestBody:
  *       required: true
  *       content:
  *         application/json:
  *           schema:
- *             type: object
- *             required:
- *               - permissions
- *             properties:
- *               permissions:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: ObjectId
- *                 description: 权限 ID 列表
+ *             type: array
+ *             items:
+ *               type: string
  *     responses:
  *       200:
- *         description: 权限更新成功
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/Role'
- *       400:
- *         $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *         description: 成功
  */
-router.put('/:id/permissions', authorize('ADMIN'), roleController.updateRolePermissions);
+router.put('/:id/menus', authorize('ADMIN'), roleController.updateRoleMenus);
 
 module.exports = router;

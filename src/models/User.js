@@ -10,54 +10,30 @@ const userSchema = new mongoose.Schema({
     minlength: 3,
     maxlength: 50
   },
-  name: {
+  nickname: {
     type: String,
-    required: true,
     trim: true,
     maxlength: 50
   },
-  sex: {
-    type: String,
-    enum: ['male', 'female', 'unknown'],
-    default: 'unknown'
-  },
-  email: {
-    type: String,
-    trim: true,
-    lowercase: true
-  },
-  phone: {
-    type: String,
-    trim: true
-  },
-  birthday: {
-    type: Date
-  },
-  password: {
-    type: String,
-    required: true,
-    minlength: 6
-  },
-  status: {
-    type: String,
-    enum: ['active', 'inactive', 'locked'],
-    default: 'active'
-  },
-  remark: {
-    type: String,
-    maxlength: 500
-  },
-  organization: {
+  avatar: { type: String },
+  sex: { type: String },
+  email: { type: String, trim: true, lowercase: true },
+  phone: { type: String, trim: true },
+  birthday: { type: Date },
+  introduction: { type: String },
+  address: { type: String },
+  tellPre: { type: String },
+  tell: { type: String },
+  password: { type: String, required: true, minlength: 6 },
+  // 0正常, 1冻结
+  status: { type: Number, enum: [0, 1], default: 0 },
+  comments: { type: String, maxlength: 500 },
+  organizationId: {
     type: mongoose.Schema.Types.ObjectId,
     ref: 'Organization'
   },
-  roles: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Role'
-  }]
-}, {
-  timestamps: true
-});
+  roles: [{ type: mongoose.Schema.Types.ObjectId, ref: 'Role' }]
+}, { timestamps: true });
 
 userSchema.pre('save', async function(next) {
   if (!this.isModified('password')) return next();

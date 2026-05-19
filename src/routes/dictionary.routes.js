@@ -64,15 +64,25 @@ router.delete('/:id', authorize('ADMIN'), dictionaryController.deleteDictionary)
  * /api/v1/dictionaries/data:
  *   get:
  *     tags: [Dictionaries]
- *     summary: 通过字典编码获取字典数据
+ *     summary: 查询字典数据
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
+ *         name: keywords
+ *         schema: { type: string }
+ *       - in: query
+ *         name: dictDataName
+ *         schema: { type: string }
+ *       - in: query
+ *         name: dictDataCode
+ *         schema: { type: string }
+ *       - in: query
  *         name: dictCode
- *         required: true
- *         schema:
- *           type: string
+ *         schema: { type: string }
+ *       - in: query
+ *         name: dictId
+ *         schema: { type: string }
  *     responses:
  *       200:
  *         description: 成功

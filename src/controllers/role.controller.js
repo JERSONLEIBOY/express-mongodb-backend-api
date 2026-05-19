@@ -1,112 +1,80 @@
 const Role = require('../models/Role');
+const Menu = require('../models/Menu');
 const response = require('../utils/response');
+
+const formatRole = (r) => ({
+  roleId: r._id,
+  roleCode: r.roleCode,
+  roleName: r.roleName,
+  comments: r.comments ?? null,
+  createTime: r.createdAt
+});
+
+const formatMenu = (m) => ({
+  menuId: m._id,
+  parentId: m.parentId ?? 0,
+  title: m.title,
+  path: m.path ?? null,
+  component: m.component ?? null,
+  menuType: m.menuType ?? 0,
+  sortNumber: m.sortNumber ?? 0,
+  authority: m.authority ?? null,
+  icon: m.icon ?? null,
+  hide: m.hide ?? 0,
+  meta: m.meta ?? null,
+  openType: m.openType ?? null,
+  createTime: m.createdAt,
+  updateTime: m.updatedAt,
+  children: null,
+  checked: m.checked ?? null
+});
+
+const buildQuery = ({ roleName, roleCode, comments }) => {
+  const query = {};
+  if (roleName) query.roleName = new RegExp(roleName, 'i');
+  if (roleCode) query.roleCode = new RegExp(roleCode, 'i');
+  if (comments) query.comments = new RegExp(comments, 'i');
+  return query;
+};
 
 /**
  * @swagger
- * /api/v1/roles:
+ * /api/v1/roles/page:
  *   get:
  *     tags: [Roles]
- *     summary: 获取角色列表
- *     description: 分页获取角色列表，支持查询过滤、排序功能
+ *     summary: 分页查询角色
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
- *         schema:
- *           type: integer
- *           minimum: 1
- *           default: 1
- *         description: 页码
+ *         schema: { type: integer, default: 1 }
  *       - in: query
- *         name: pageSize
- *         schema:
- *           type: integer
- *           minimum: 1
- *           maximum: 100
- *           default: 20
- *         description: 每页数量
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
  *       - in: query
- *         name: name
- *         schema:
- *           type: string
- *         description: 角色名模糊搜索
+ *         name: roleName
+ *         schema: { type: string }
  *       - in: query
- *         name: code
- *         schema:
- *           type: string
- *         description: 角色代码模糊搜索
+ *         name: roleCode
+ *         schema: { type: string }
  *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [active, inactive]
- *         description: 角色状态
- *       - in: query
- *         name: sortField
- *         schema:
- *           type: string
- *           default: createdAt
- *           enum: [name, code, createdAt, updatedAt]
- *         description: 排序字段
- *       - in: query
- *         name: sortOrder
- *         schema:
- *           type: string
- *           default: desc
- *           enum: [asc, desc]
- *         description: 排序方式
+ *         name: comments
+ *         schema: { type: string }
  *     responses:
  *       200:
- *         description: 成功获取角色列表
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: object
- *                       properties:
- *                         list:
- *                           type: array
- *                           items:
- *                             $ref: '#/components/schemas/Role'
- *                         pagination:
- *                           $ref: '#/components/schemas/Pagination'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *         description: 成功
  */
-const getRoles = async (req, res, next) => {
+const getRolesPage = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, name, code, status, sortField = 'createdAt', sortOrder = 'desc' } = req.query;
-
-    const query = {};
-
-    if (name) query.name = new RegExp(name, 'i');
-    if (code) query.code = new RegExp(code, 'i');
-    if (status) query.status = status;
-
-    const limit = Math.min(parseInt(pageSize, 10) || 20, 100);
-    const skip = (parseInt(page, 10) - 1) * limit;
-
-    const sortObj = {};
-    sortObj[sortField] = sortOrder === 'asc' ? 1 : -1;
-
-    const [list, total] = await Promise.all([
-      Role.find(query)
-        .populate('permissions', 'name type path')
-        .sort(sortObj)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+    const { page = 1, limit = 20, ...filters } = req.query;
+    const query = buildQuery(filters);
+    const skip = (Number(page) - 1) * Number(limit);
+    const [list, count] = await Promise.all([
+      Role.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
       Role.countDocuments(query)
     ]);
-
-    return response.paginated(res, { list, total, page, pageSize });
+    return response.success(res, { list: list.map(formatRole), count });
   } catch (error) {
     next(error);
   }
@@ -114,53 +82,30 @@ const getRoles = async (req, res, next) => {
 
 /**
  * @swagger
- * /api/v1/roles/{id}:
+ * /api/v1/roles:
  *   get:
  *     tags: [Roles]
- *     summary: 获取单个角色信息
- *     description: 根据 ID 获取角色的详细信息，包含权限信息
+ *     summary: 查询角色列表
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 角色 ID
+ *       - in: query
+ *         name: roleName
+ *         schema: { type: string }
+ *       - in: query
+ *         name: roleCode
+ *         schema: { type: string }
+ *       - in: query
+ *         name: comments
+ *         schema: { type: string }
  *     responses:
  *       200:
- *         description: 成功获取角色信息
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/Role'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *         description: 成功
  */
-const getRoleById = async (req, res, next) => {
+const getRoles = async (req, res, next) => {
   try {
-    const { id } = req.params;
-
-    const role = await Role.findById(id)
-      .populate('permissions', 'name type path component')
-      .lean();
-
-    if (!role) {
-      return response.notFound(res, '角色不存在');
-    }
-
-    return response.success(res, role);
+    const list = await Role.find(buildQuery(req.query)).sort({ createdAt: -1 }).lean();
+    return response.success(res, list.map(formatRole));
   } catch (error) {
     next(error);
   }
@@ -171,8 +116,7 @@ const getRoleById = async (req, res, next) => {
  * /api/v1/roles:
  *   post:
  *     tags: [Roles]
- *     summary: 创建角色
- *     description: 创建新角色，仅限管理员操作
+ *     summary: 添加角色
  *     security:
  *       - bearerAuth: []
  *     requestBody:
@@ -180,56 +124,24 @@ const getRoleById = async (req, res, next) => {
  *       content:
  *         application/json:
  *           schema:
- *             $ref: '#/components/schemas/CreateRoleRequest'
+ *             type: object
+ *             required: [roleName, roleCode]
+ *             properties:
+ *               roleName: { type: string }
+ *               roleCode: { type: string }
+ *               comments: { type: string }
  *     responses:
- *       201:
- *         description: 角色创建成功
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/Role'
- *                     code:
- *                       type: integer
- *                       example: 201
- *                     message:
- *                       type: string
- *                       example: '角色创建成功'
- *       400:
- *         $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *       200:
+ *         description: 成功
  */
 const createRole = async (req, res, next) => {
   try {
-    const { name, code, remark, permissions, status } = req.body;
-
-    const existingRole = await Role.findOne({ code: code.toUpperCase() });
-    if (existingRole) {
-      return response.badRequest(res, '角色编码已存在');
+    const { roleName, roleCode, comments } = req.body;
+    if (await Role.findOne({ roleCode: roleCode.toUpperCase() }).lean()) {
+      return response.badRequest(res, '角色标识已存在');
     }
-
-    const role = await Role.create({
-      name,
-      code: code.toUpperCase(),
-      remark,
-      permissions,
-      status
-    });
-
-    const populatedRole = await Role.findById(role._id)
-      .populate('permissions', 'name type path')
-      .lean();
-
-    return response.created(res, populatedRole, '角色创建成功');
+    const role = await Role.create({ roleName, roleCode, comments });
+    return response.created(res, formatRole(role.toObject()), '角色创建成功');
   } catch (error) {
     next(error);
   }
@@ -240,18 +152,14 @@ const createRole = async (req, res, next) => {
  * /api/v1/roles/{id}:
  *   put:
  *     tags: [Roles]
- *     summary: 更新角色信息
- *     description: 更新指定角色的信息，仅限管理员操作
+ *     summary: 修改角色
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 角色 ID
+ *         schema: { type: string }
  *     requestBody:
  *       required: true
  *       content:
@@ -259,68 +167,22 @@ const createRole = async (req, res, next) => {
  *           schema:
  *             type: object
  *             properties:
- *               name:
- *                 type: string
- *                 maxLength: 50
- *                 description: 角色名称
- *               remark:
- *                 type: string
- *                 maxLength: 500
- *                 description: 备注
- *               permissions:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: ObjectId
- *                 description: 权限 ID 列表
- *               status:
- *                 type: string
- *                 enum: [active, inactive]
- *                 description: 角色状态
+ *               roleName: { type: string }
+ *               comments: { type: string }
  *     responses:
  *       200:
- *         description: 角色更新成功
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/Role'
- *       400:
- *         $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *         description: 成功
  */
 const updateRole = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { name, remark, permissions, status } = req.body;
-
-    const role = await Role.findById(id);
-    if (!role) {
-      return response.notFound(res, '角色不存在');
-    }
-
+    const { roleName, comments } = req.body;
+    if (!await Role.findById(id).lean()) return response.notFound(res, '角色不存在');
     const updates = {};
-    if (name !== undefined) updates.name = name;
-    if (remark !== undefined) updates.remark = remark;
-    if (permissions !== undefined) updates.permissions = permissions;
-    if (status !== undefined) updates.status = status;
-
-    const updatedRole = await Role.findByIdAndUpdate(id, updates, { new: true, runValidators: true })
-      .populate('permissions', 'name type path')
-      .lean();
-
-    return response.success(res, updatedRole, '角色更新成功');
+    if (roleName !== undefined) updates.roleName = roleName;
+    if (comments !== undefined) updates.comments = comments;
+    const updated = await Role.findByIdAndUpdate(id, updates, { new: true, runValidators: true }).lean();
+    return response.success(res, formatRole(updated), '角色更新成功');
   } catch (error) {
     next(error);
   }
@@ -332,61 +194,24 @@ const updateRole = async (req, res, next) => {
  *   delete:
  *     tags: [Roles]
  *     summary: 删除角色
- *     description: 删除指定角色，不能删除管理员角色，仅限管理员操作
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 角色 ID
+ *         schema: { type: string }
  *     responses:
- *       204:
- *         description: 角色删除成功
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: null
- *                     code:
- *                       type: integer
- *                       example: 204
- *                     message:
- *                       type: string
- *                       example: '角色删除成功'
- *       400:
- *         $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *       200:
+ *         description: 成功
  */
 const deleteRole = async (req, res, next) => {
   try {
     const { id } = req.params;
-
-    const role = await Role.findById(id);
-    if (!role) {
-      return response.notFound(res, '角色不存在');
-    }
-
-    if (role.code === 'ADMIN') {
-      return response.badRequest(res, '不能删除管理员角色');
-    }
-
+    const role = await Role.findById(id).lean();
+    if (!role) return response.notFound(res, '角色不存在');
+    if (role.roleCode === 'ADMIN') return response.badRequest(res, '不能删除管理员角色');
     await Role.findByIdAndDelete(id);
-
     return response.success(res, null, '角色删除成功');
   } catch (error) {
     next(error);
@@ -395,88 +220,85 @@ const deleteRole = async (req, res, next) => {
 
 /**
  * @swagger
- * /api/v1/roles/{id}/permissions:
- *   put:
+ * /api/v1/roles/batch:
+ *   delete:
  *     tags: [Roles]
- *     summary: 更新角色权限
- *     description: 批量更新指定角色的权限，仅限管理员操作
+ *     summary: 批量删除角色
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: array
+ *             items:
+ *               type: string
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+const deleteRoleBatch = async (req, res, next) => {
+  try {
+    const ids = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return response.badRequest(res, '请提供要删除的ids');
+    await Role.deleteMany({ _id: { $in: ids }, roleCode: { $ne: 'ADMIN' } });
+    return response.success(res, null, '批量删除成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @swagger
+ * /api/v1/roles/{id}/menus:
+ *   get:
+ *     tags: [Roles]
+ *     summary: 获取角色分配的菜单
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: path
  *         name: id
  *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 角色 ID
- *     requestBody:
- *       required: true
- *       content:
- *         application/json:
- *           schema:
- *             type: object
- *             required:
- *               - permissions
- *             properties:
- *               permissions:
- *                 type: array
- *                 items:
- *                   type: string
- *                   format: ObjectId
- *                 description: 权限 ID 列表
+ *         schema: { type: string }
  *     responses:
  *       200:
- *         description: 权限更新成功
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/Role'
- *       400:
- *         $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *         description: 成功
  */
-const updateRolePermissions = async (req, res, next) => {
+const getRoleMenus = async (req, res, next) => {
+  try {
+    const role = await Role.findById(req.params.id).lean();
+    if (!role) return response.notFound(res, '角色不存在');
+    const assignedIds = new Set((role.menus || []).map(id => id.toString()));
+    const menus = await Menu.find({}).sort({ sortNumber: 1 }).lean();
+    return response.success(res, menus.map(m => ({
+      ...formatMenu(m),
+      checked: assignedIds.has(m._id.toString())
+    })));
+  } catch (error) {
+    next(error);
+  }
+};
+const updateRoleMenus = async (req, res, next) => {
   try {
     const { id } = req.params;
-    const { permissions } = req.body;
-
-    const role = await Role.findById(id);
-    if (!role) {
-      return response.notFound(res, '角色不存在');
-    }
-
-    const updatedRole = await Role.findByIdAndUpdate(
-      id,
-      { permissions },
-      { new: true, runValidators: true }
-    )
-      .populate('permissions', 'name type path')
-      .lean();
-
-    return response.success(res, updatedRole, '权限更新成功');
+    const menuIds = req.body;
+    if (!await Role.findById(id).lean()) return response.notFound(res, '角色不存在');
+    await Role.findByIdAndUpdate(id, { menus: menuIds });
+    return response.success(res, null, '角色菜单更新成功');
   } catch (error) {
     next(error);
   }
 };
 
 module.exports = {
+  getRolesPage,
   getRoles,
-  getRoleById,
   createRole,
   updateRole,
   deleteRole,
-  updateRolePermissions
+  deleteRoleBatch,
+  getRoleMenus,
+  updateRoleMenus
 };
