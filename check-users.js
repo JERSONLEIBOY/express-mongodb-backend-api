@@ -2,7 +2,7 @@ const mongoose = require('mongoose');
 
 async function checkUsers() {
   try {
-    await mongoose.connect('mongodb://mongodb:27017/ele_admin');
+    await mongoose.connect('mongodb://localhost:27017/ele_admin');
     console.log('Connected to MongoDB');
     
     const users = await mongoose.connection.db.collection('users').find({}).toArray();

@@ -15,5 +15,5 @@ module.exports = (app) => {
   app.use('/api/v1/organizations', organizationRoutes);
   app.use('/api/v1/dictionaries', dictionaryRoutes);
   app.use('/api/v1/files', fileRoutes);
-  app.use('/api/v1', logRoutes);
+  app.use('/api/v1/logs', logRoutes);
 };

@@ -7,385 +7,169 @@ const response = require('../utils/response');
 const uploadsDir = path.resolve(config.upload.path);
 
 const safeResolvePath = (filePath) => {
-  const resolved = path.resolve(filePath);
-  if (!resolved.startsWith(uploadsDir + path.sep) && resolved !== uploadsDir) {
-    return null;
-  }
+  const resolved = path.resolve(path.join(uploadsDir, filePath));
+  if (!resolved.startsWith(uploadsDir + path.sep) && resolved !== uploadsDir) return null;
   return resolved;
 };
 
-/**
- * @swagger
- * tags:
- *   name: Files
- *   description: 文件管理接口
- */
+const getBaseUrl = (req) => `${req.protocol}://${req.get('host')}`;
 
-/**
- * @swagger
- * /api/v1/files:
- *   get:
- *     tags: [Files]
- *     summary: 获取文件列表
- *     description: 分页获取文件列表，支持按名称模糊搜索和排序
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: 页码
- *       - in: query
- *         name: pageSize
- *         schema:
- *           type: integer
- *           default: 20
- *           maximum: 100
- *         description: 每页记录数（最大 100）
- *       - in: query
- *         name: name
- *         schema:
- *           type: string
- *         description: 文件名模糊搜索
- *       - in: query
- *         name: sortField
- *         schema:
- *           type: string
- *           default: uploadTime
- *           enum: [name, size, uploadTime, createdAt]
- *         description: 排序字段
- *       - in: query
- *         name: sortOrder
- *         schema:
- *           type: string
- *           default: desc
- *           enum: [asc, desc]
- *         description: 排序方式
- *     responses:
- *       200:
- *         description: 成功获取文件列表
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: object
- *                       properties:
- *                         list:
- *                           type: array
- *                           items:
- *                             $ref: '#/components/schemas/File'
- *                         pagination:
- *                           $ref: '#/components/schemas/Pagination'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
- */
+const IMAGE_TYPES = new Set(['image/jpeg', 'image/png', 'image/gif', 'image/webp', 'image/svg+xml']);
+
+const formatFile = (file, baseUrl) => ({
+  id: file._id,
+  name: file.name,
+  path: file.path,
+  length: file.length,
+  contentType: file.contentType,
+  createUserId: file.createUserId?._id || file.createUserId,
+  createTime: file.createdAt,
+  url: `${baseUrl}/api/v1/files/preview/${file.path}`,
+  thumbnail: IMAGE_TYPES.has(file.contentType) ? `${baseUrl}/api/v1/files/preview/${file.path}` : null,
+  downloadUrl: `${baseUrl}/api/v1/files/download/${file.path}`,
+  createUsername: file.createUserId?.username || null,
+  createNickname: file.createUserId?.nickname || null
+});
+
 const getFiles = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, name, sortField = 'uploadTime', sortOrder = 'desc' } = req.query;
+    const { page = 1, limit = 20, name, path: filePath, createNickname } = req.query;
 
     const query = {};
-
     if (name) query.name = new RegExp(name, 'i');
+    if (filePath) query.path = new RegExp(filePath, 'i');
 
-    const limit = Math.min(parseInt(pageSize, 10) || 20, 100);
-    const skip = (parseInt(page, 10) - 1) * limit;
+    const pageNum = parseInt(page, 10);
+    const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
+    const skip = (pageNum - 1) * limitNum;
 
-    const sortObj = {};
-    sortObj[sortField] = sortOrder === 'asc' ? 1 : -1;
+    let dbQuery = File.find(query).populate('createUserId', 'username nickname').sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean();
 
-    const [list, total] = await Promise.all([
-      File.find(query)
-        .populate('uploader', 'username name')
-        .sort(sortObj)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      File.countDocuments(query)
-    ]);
-
-    return response.paginated(res, { list, total, page, pageSize });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * @swagger
- * /api/v1/files/{id}:
- *   get:
- *     tags: [Files]
- *     summary: 获取单个文件信息
- *     description: 根据 ID 获取文件元信息
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 文件 ID
- *     responses:
- *       200:
- *         description: 成功获取文件信息
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/File'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
- */
-const getFileById = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const file = await File.findById(id)
-      .populate('uploader', 'username name')
-      .lean();
-
-    if (!file) {
-      return response.notFound(res, '文件不存在');
+    if (createNickname) {
+      // 需要先查用户再过滤，简单处理：先查全部再过滤
+      const User = require('../models/User');
+      const users = await User.find({ nickname: new RegExp(createNickname, 'i') }, '_id').lean();
+      query.createUserId = { $in: users.map(u => u._id) };
+      dbQuery = File.find(query).populate('createUserId', 'username nickname').sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean();
     }
 
-    return response.success(res, file);
+    const [list, count] = await Promise.all([dbQuery, File.countDocuments(query)]);
+    const baseUrl = getBaseUrl(req);
+
+    return response.success(res, { list: list.map(f => formatFile(f, baseUrl)), count });
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * @swagger
- * /api/v1/files/upload:
- *   post:
- *     tags: [Files]
- *     summary: 上传文件
- *     description: |
- *       上传单个文件，仅支持以下类型：
- *       - 图片：jpg、jpeg、png、gif、webp、svg
- *       - 文档：pdf、doc、docx、xls、xlsx、ppt、pptx、txt、csv
- *       - 压缩包：zip、rar
- *     security:
- *       - bearerAuth: []
- *     requestBody:
- *       required: true
- *       content:
- *         multipart/form-data:
- *           schema:
- *             type: object
- *             required: [file]
- *             properties:
- *               file:
- *                 type: string
- *                 format: binary
- *                 description: 要上传的文件
- *     responses:
- *       201:
- *         description: 文件上传成功
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/File'
- *                     code:
- *                       type: integer
- *                       example: 201
- *                     message:
- *                       type: string
- *                       example: '文件上传成功'
- *       400:
- *         description: 文件类型不支持、超出大小限制或未选择文件
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
- */
 const uploadFile = async (req, res, next) => {
   try {
-    if (!req.file) {
-      return response.badRequest(res, '请选择要上传的文件');
-    }
+    if (!req.file) return response.badRequest(res, '请选择要上传的文件');
 
-    const fileData = {
-      name: req.file.originalname,
-      path: req.file.path,
-      size: req.file.size,
-      mimeType: req.file.mimetype,
-      uploader: req.user._id,
-      uploadTime: new Date()
-    };
+    const relativePath = path.relative(uploadsDir, req.file.path).replace(/\\/g, '/');
+    const file = await File.create({
+      name: Buffer.from(req.file.originalname, 'latin1').toString('utf8'),
+      path: relativePath,
+      length: req.file.size,
+      contentType: req.file.mimetype,
+      createUserId: req.user._id
+    });
 
-    const file = await File.create(fileData);
-
-    const populatedFile = await File.findById(file._id)
-      .populate('uploader', 'username name')
-      .lean();
-
-    return response.created(res, populatedFile, '文件上传成功');
+    const populated = await File.findById(file._id).populate('createUserId', 'username nickname').lean();
+    return response.created(res, formatFile(populated, getBaseUrl(req)), '文件上传成功');
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * @swagger
- * /api/v1/files/{id}:
- *   delete:
- *     tags: [Files]
- *     summary: 删除文件
- *     description: 删除指定文件及其磁盘存储，仅限管理员操作
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 文件 ID
- *     responses:
- *       200:
- *         description: 文件删除成功
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: object
- *                       nullable: true
- *                     message:
- *                       type: string
- *                       example: '文件删除成功'
- *       400:
- *         $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
- */
+const uploadBase64 = async (req, res, next) => {
+  try {
+    const { base64, name, contentType } = req.body;
+    if (!base64 || !name || !contentType) return response.badRequest(res, '缺少必要参数: base64, name, contentType');
+
+    const matches = base64.match(/^data:([^;]+);base64,(.+)$/);
+    const data = matches ? matches[2] : base64;
+    const buffer = Buffer.from(data, 'base64');
+
+    if (buffer.length > config.upload.maxSize) return response.badRequest(res, '文件超出大小限制');
+
+    const ext = path.extname(name).toLowerCase() || '.bin';
+    const filename = `${Date.now()}-${Math.round(Math.random() * 1e9)}${ext}`;
+    const filePath = path.join(uploadsDir, filename);
+    fs.writeFileSync(filePath, buffer);
+
+    const file = await File.create({
+      name,
+      path: filename,
+      length: buffer.length,
+      contentType,
+      createUserId: req.user._id
+    });
+
+    const populated = await File.findById(file._id).populate('createUserId', 'username nickname').lean();
+    return response.created(res, formatFile(populated, getBaseUrl(req)), '文件上传成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+const previewFile = async (req, res, next) => {
+  try {
+    const filePath = safeResolvePath(req.params[0]);
+    if (!filePath || !fs.existsSync(filePath)) return response.notFound(res, '文件不存在');
+    res.sendFile(filePath);
+  } catch (error) {
+    next(error);
+  }
+};
+
+const downloadFile = async (req, res, next) => {
+  try {
+    const relativePath = req.params[0];
+    const filePath = safeResolvePath(relativePath);
+    if (!filePath || !fs.existsSync(filePath)) return response.notFound(res, '文件不存在');
+
+    const file = await File.findOne({ path: relativePath }).lean();
+    const filename = file ? file.name : path.basename(relativePath);
+    res.download(filePath, filename);
+  } catch (error) {
+    next(error);
+  }
+};
+
 const deleteFile = async (req, res, next) => {
   try {
     const { id } = req.params;
-
     const file = await File.findById(id);
-    if (!file) {
-      return response.notFound(res, '文件不存在');
-    }
+    if (!file) return response.notFound(res, '文件不存在');
 
     const filePath = safeResolvePath(file.path);
-    if (!filePath) {
-      return response.badRequest(res, '非法文件路径');
-    }
-    if (fs.existsSync(filePath)) {
-      fs.unlinkSync(filePath);
-    }
+    if (!filePath) return response.badRequest(res, '非法文件路径');
+    if (fs.existsSync(filePath)) fs.unlinkSync(filePath);
 
     await File.findByIdAndDelete(id);
-
     return response.success(res, null, '文件删除成功');
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * @swagger
- * /api/v1/files/{id}/download:
- *   get:
- *     tags: [Files]
- *     summary: 下载文件
- *     description: 根据 ID 下载文件，浏览器会以原始文件名提示保存
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 文件 ID
- *     responses:
- *       200:
- *         description: 返回文件二进制流
- *         content:
- *           application/octet-stream:
- *             schema:
- *               type: string
- *               format: binary
- *       400:
- *         $ref: '#/components/schemas/Error'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         description: 文件不存在或已丢失
- *         content:
- *           application/json:
- *             schema:
- *               $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
- */
-const downloadFile = async (req, res, next) => {
+const batchDeleteFiles = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const ids = req.body;
+    if (!Array.isArray(ids) || ids.length === 0) return response.badRequest(res, '请提供要删除的文件ID列表');
 
-    const file = await File.findById(id);
-    if (!file) {
-      return response.notFound(res, '文件不存在');
+    const files = await File.find({ _id: { $in: ids } }).lean();
+    for (const file of files) {
+      const filePath = safeResolvePath(file.path);
+      if (filePath && fs.existsSync(filePath)) fs.unlinkSync(filePath);
     }
 
-    const filePath = safeResolvePath(file.path);
-    if (!filePath) {
-      return response.badRequest(res, '非法文件路径');
-    }
-    if (!fs.existsSync(filePath)) {
-      return response.notFound(res, '文件已丢失');
-    }
-
-    res.download(filePath, file.name);
+    await File.deleteMany({ _id: { $in: ids } });
+    return response.success(res, null, '批量删除成功');
   } catch (error) {
     next(error);
   }
 };
 
-module.exports = {
-  getFiles,
-  getFileById,
-  uploadFile,
-  deleteFile,
-  downloadFile
-};
+module.exports = { getFiles, uploadFile, uploadBase64, previewFile, downloadFile, deleteFile, batchDeleteFiles };

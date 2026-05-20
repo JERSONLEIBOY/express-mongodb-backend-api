@@ -185,7 +185,7 @@ router.post('/logout', authenticate, authController.logout);
  *   get:
  *     tags: [Authentication]
  *     summary: 获取当前用户信息
- *     description: 获取当前登录用户的详细信息，包括角色和权限
+ *     description: 获取当前登录用户的个人信息、角色列表、菜单/权限列表。ADMIN 角色用户的 authorities 返回数据库中全部菜单。
  *     security:
  *       - bearerAuth: []
  *     responses:
@@ -199,7 +199,58 @@ router.post('/logout', authenticate, authController.logout);
  *                 - type: object
  *                   properties:
  *                     data:
- *                       $ref: '#/components/schemas/User'
+ *                       type: object
+ *                       properties:
+ *                         userId:           { type: string }
+ *                         username:         { type: string }
+ *                         nickname:         { type: string }
+ *                         avatar:           { type: string }
+ *                         sex:              { type: string }
+ *                         sexName:          { type: string }
+ *                         phone:            { type: string }
+ *                         email:            { type: string }
+ *                         birthday:         { type: string, nullable: true }
+ *                         introduction:     { type: string }
+ *                         organizationId:   { type: string }
+ *                         organizationName: { type: string }
+ *                         status:           { type: integer, enum: [0, 1] }
+ *                         address:          { type: string }
+ *                         tellPre:          { type: string }
+ *                         tell:             { type: string }
+ *                         createTime:       { type: string, example: '2026-05-15 14:40:28' }
+ *                         roles:
+ *                           type: array
+ *                           description: 格式同 /api/v1/roles/page
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               roleId:     { type: string }
+ *                               roleCode:   { type: string }
+ *                               roleName:   { type: string }
+ *                               comments:   { type: string, nullable: true }
+ *                               createTime: { type: string }
+ *                         authorities:
+ *                           type: array
+ *                           description: 用户拥有的菜单，格式同 /api/v1/roles/{id}/menus
+ *                           items:
+ *                             type: object
+ *                             properties:
+ *                               menuId:     { type: string }
+ *                               parentId:   { type: string }
+ *                               title:      { type: string }
+ *                               path:       { type: string, nullable: true }
+ *                               component:  { type: string, nullable: true }
+ *                               menuType:   { type: integer }
+ *                               sortNumber: { type: integer }
+ *                               authority:  { type: string, nullable: true }
+ *                               icon:       { type: string, nullable: true }
+ *                               hide:       { type: integer }
+ *                               meta:       { type: string, nullable: true }
+ *                               openType:   { type: integer, nullable: true }
+ *                               createTime: { type: string }
+ *                               updateTime: { type: string }
+ *                               children:   { type: object, nullable: true }
+ *                               checked:    { type: integer, nullable: true }
  *       401:
  *         $ref: '#/components/schemas/Error'
  *       500:

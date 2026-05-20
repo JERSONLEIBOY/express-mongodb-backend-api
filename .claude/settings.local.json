@@ -53,7 +53,15 @@
       "Bash(powershell *)",
       "Bash(grep -v \"^$\")",
       "Bash(mongosh ele_admin --eval ' *)",
-      "Bash(npm list *)"
+      "Bash(npm list *)",
+      "WebFetch(domain:v2.eleadmin.com)",
+      "Bash(python3 -m json.tool)",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); print\\(d['data']['name']\\)\")",
+      "Bash(npx pm2 *)",
+      "Bash(findstr /I \"node nodemon pm2\")",
+      "Bash(set TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTA2YmZkY2VmMDZkYWMyYWViYzg5ZGUiLCJ1c2VybmFtZSI6ImFkbWluIiwiaWF0IjoxNzc5MjUyNDgzLCJleHAiOjE3Nzk4NTcyODN9.0778e_H4rvA9v07S5SDAUPlViGkOkN8wqVUYyhmkApE)",
+      "Bash(findstr /I \"X-Request-Id status HTTP\")",
+      "Bash(findstr /I \"X-Request-Id HTTP\")"
     ]
   }
 }

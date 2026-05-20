@@ -10,6 +10,7 @@ const { config, logger, mongoOptions } = require('./config');
 const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middlewares/error.middleware');
 const { operationLogger, requestLogger } = require('./middlewares/logger.middleware');
+const { traceMiddleware } = require('./middlewares/trace.middleware');
 const { swaggerUi, specs } = require('./config/swagger');
 
 const app = express();
@@ -23,6 +24,9 @@ app.use(cors({
 
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+
+// TraceId 中间件：尽可能早，便于其它中间件 / 日志使用 req.traceId
+app.use(traceMiddleware);
 
 const uploadsDir = path.resolve(config.upload.path);
 if (!fs.existsSync(uploadsDir)) {
@@ -48,11 +52,12 @@ app.get('/', (req, res) => {
 app.use('/api-docs', swaggerUi.serve);
 app.get('/api-docs', swaggerUi.setup(specs));
 
+app.use(operationLogger);
+
 routes(app);
 
 app.use(notFoundHandler);
 app.use(errorHandler);
-app.use(operationLogger);
 
 const startServer = async () => {
   try {

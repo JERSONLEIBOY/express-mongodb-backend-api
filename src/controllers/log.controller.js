@@ -1,135 +1,159 @@
 const LoginLog = require('../models/LoginLog');
 const OperationLog = require('../models/OperationLog');
+const User = require('../models/User');
 const response = require('../utils/response');
 
-/**
- * @swagger
- * tags:
- *   name: Logs
- *   description: 日志管理接口
- */
+const formatLoginLog = (log, userMap) => ({
+  id: String(log._id),
+  username: log.username ?? '',
+  os: log.os ?? '',
+  device: log.device ?? '',
+  browser: log.browser ?? '',
+  ip: log.ip ?? '',
+  location: log.location ?? '',
+  loginType: log.loginType ?? 0,
+  comments: log.comments ?? '',
+  createTime: log.createdAt,
+  nickname: log.nickname || (userMap?.get(log.username)?.nickname ?? '')
+});
+
+const formatOperationLog = (log, userMap) => {
+  const u = log.userId && typeof log.userId === 'object'
+    ? log.userId
+    : (userMap?.get(String(log.userId)) || null);
+  return {
+    id: String(log._id),
+    userId: u?._id ? String(u._id) : (log.userId ? String(log.userId) : null),
+    username: u?.username ?? '',
+    nickname: u?.nickname ?? '',
+    traceId: log.traceId ?? '',
+    module: log.module ?? '',
+    businessType: log.businessType ?? 'OTHER',
+    description: log.description ?? '',
+    url: log.url ?? '',
+    requestMethod: log.requestMethod ?? '',
+    method: log.method ?? '',
+    params: log.params ?? '',
+    result: log.result ?? '',
+    error: log.error ?? '',
+    spendTime: log.spendTime ?? 0,
+    os: log.os ?? '',
+    device: log.device ?? '',
+    browser: log.browser ?? '',
+    ip: log.ip ?? '',
+    location: log.location ?? '',
+    status: log.status ?? 0,
+    createTime: log.createdAt
+  };
+};
+
+const buildLoginLogQuery = ({ username, nickname, loginType, createTimeStart, createTimeEnd }) => {
+  const query = {};
+  if (username) query.username = new RegExp(username, 'i');
+  if (nickname) query.nickname = new RegExp(nickname, 'i');
+  if (loginType !== undefined && loginType !== '') query.loginType = Number(loginType);
+  if (createTimeStart || createTimeEnd) {
+    query.createdAt = {};
+    if (createTimeStart) query.createdAt.$gte = new Date(createTimeStart);
+    if (createTimeEnd) query.createdAt.$lte = new Date(createTimeEnd);
+  }
+  return query;
+};
+
+const buildOperationLogQuery = async ({ username, module, status, createTimeStart, createTimeEnd }) => {
+  const query = {};
+  if (module) query.module = new RegExp(module, 'i');
+  if (status !== undefined && status !== '') query.status = Number(status);
+  if (createTimeStart || createTimeEnd) {
+    query.createdAt = {};
+    if (createTimeStart) query.createdAt.$gte = new Date(createTimeStart);
+    if (createTimeEnd) query.createdAt.$lte = new Date(createTimeEnd);
+  }
+  if (username) {
+    const users = await User.find({ username: new RegExp(username, 'i') }, '_id').lean();
+    query.userId = { $in: users.map(u => u._id) };
+  }
+  return query;
+};
 
 /**
  * @swagger
- * /api/v1/logs/login-logs:
+ * /api/v1/logs/login-logs/page:
  *   get:
  *     tags: [Logs]
- *     summary: 获取登录日志列表
- *     description: 分页获取登录日志，支持按用户名、登录类型、状态、时间范围过滤
+ *     summary: 分页查询登录日志
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
  *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: 页码
+ *         schema: { type: integer, default: 1 }
  *       - in: query
- *         name: pageSize
- *         schema:
- *           type: integer
- *           default: 20
- *           maximum: 100
- *         description: 每页记录数（最大 100）
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
  *       - in: query
  *         name: username
- *         schema:
- *           type: string
- *         description: 用户名模糊搜索
+ *         schema: { type: string }
+ *         description: 用户账号
+ *       - in: query
+ *         name: nickname
+ *         schema: { type: string }
+ *         description: 用户昵称
  *       - in: query
  *         name: loginType
- *         schema:
- *           type: string
- *           enum: [login_success, login_fail, refresh_token]
- *         description: 登录类型
+ *         schema: { type: integer, enum: [0, 1, 2, 3] }
+ *         description: 操作类型, 0登录成功, 1登录失败, 2退出登录, 3续签token
  *       - in: query
- *         name: status
- *         schema:
- *           type: string
- *           enum: [success, fail]
- *         description: 登录结果
+ *         name: createTimeStart
+ *         schema: { type: string, format: date-time }
+ *         description: 开始时间
  *       - in: query
- *         name: startDate
- *         schema:
- *           type: string
- *           format: date-time
- *         description: 起始时间（ISO 8601）
- *       - in: query
- *         name: endDate
- *         schema:
- *           type: string
- *           format: date-time
- *         description: 结束时间（ISO 8601）
- *       - in: query
- *         name: sortField
- *         schema:
- *           type: string
- *           default: loginTime
- *           enum: [loginTime, username, status, createdAt]
- *         description: 排序字段
- *       - in: query
- *         name: sortOrder
- *         schema:
- *           type: string
- *           default: desc
- *           enum: [asc, desc]
- *         description: 排序方式
+ *         name: createTimeEnd
+ *         schema: { type: string, format: date-time }
+ *         description: 截止时间
  *     responses:
  *       200:
- *         description: 成功获取登录日志列表
+ *         description: 成功
  *         content:
  *           application/json:
  *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: object
- *                       properties:
- *                         list:
- *                           type: array
- *                           items:
- *                             $ref: '#/components/schemas/LoginLog'
- *                         pagination:
- *                           $ref: '#/components/schemas/Pagination'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 list:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: string }
+ *                       username: { type: string }
+ *                       os: { type: string }
+ *                       device: { type: string }
+ *                       browser: { type: string }
+ *                       ip: { type: string }
+ *                       location: { type: string, description: IP 归属地 }
+ *                       loginType: { type: integer }
+ *                       comments: { type: string }
+ *                       createTime: { type: string, format: date-time }
+ *                       nickname: { type: string }
+ *                 count: { type: integer }
  */
-const getLoginLogs = async (req, res, next) => {
+const getLoginLogsPage = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, username, loginType, status, startDate, endDate, sortField = 'loginTime', sortOrder = 'desc' } = req.query;
-
-    const query = {};
-
-    if (username) query.username = new RegExp(username, 'i');
-    if (loginType) query.loginType = loginType;
-    if (status) query.status = status;
-    if (startDate || endDate) {
-      query.loginTime = {};
-      if (startDate) query.loginTime.$gte = new Date(startDate);
-      if (endDate) query.loginTime.$lte = new Date(endDate);
-    }
-
-    const limit = Math.min(parseInt(pageSize, 10) || 20, 100);
-    const skip = (parseInt(page, 10) - 1) * limit;
-
-    const sortObj = {};
-    sortObj[sortField] = sortOrder === 'asc' ? 1 : -1;
-
-    const [list, total] = await Promise.all([
-      LoginLog.find(query)
-        .sort(sortObj)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
+    const { page = 1, limit = 20, ...filters } = req.query;
+    const query = buildLoginLogQuery(filters);
+    const skip = (Number(page) - 1) * Number(limit);
+    const [list, count] = await Promise.all([
+      LoginLog.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
       LoginLog.countDocuments(query)
     ]);
 
-    return response.paginated(res, { list, total, page, pageSize });
+    const usernames = [...new Set(list.map(l => l.username).filter(Boolean))];
+    const users = usernames.length
+      ? await User.find({ username: { $in: usernames } }, 'username nickname').lean()
+      : [];
+    const userMap = new Map(users.map(u => [u.username, u]));
+
+    return response.success(res, { list: list.map(l => formatLoginLog(l, userMap)), count });
   } catch (error) {
     next(error);
   }
@@ -137,51 +161,67 @@ const getLoginLogs = async (req, res, next) => {
 
 /**
  * @swagger
- * /api/v1/logs/login-logs/{id}:
+ * /api/v1/logs/login-logs:
  *   get:
  *     tags: [Logs]
- *     summary: 获取单条登录日志
- *     description: 根据 ID 获取登录日志详情
+ *     summary: 查询登录日志列表（不分页）
  *     security:
  *       - bearerAuth: []
  *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 日志 ID
+ *       - in: query
+ *         name: username
+ *         schema: { type: string }
+ *         description: 用户账号
+ *       - in: query
+ *         name: nickname
+ *         schema: { type: string }
+ *         description: 用户昵称
+ *       - in: query
+ *         name: loginType
+ *         schema: { type: integer, enum: [0, 1, 2, 3] }
+ *         description: 操作类型, 0登录成功, 1登录失败, 2退出登录, 3续签token
+ *       - in: query
+ *         name: createTimeStart
+ *         schema: { type: string, format: date-time }
+ *         description: 开始时间
+ *       - in: query
+ *         name: createTimeEnd
+ *         schema: { type: string, format: date-time }
+ *         description: 截止时间
  *     responses:
  *       200:
- *         description: 成功获取登录日志详情
+ *         description: 成功
  *         content:
  *           application/json:
  *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/LoginLog'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: string }
+ *                   username: { type: string }
+ *                   os: { type: string }
+ *                   device: { type: string }
+ *                   browser: { type: string }
+ *                   ip: { type: string }
+ *                   location: { type: string, description: IP 归属地 }
+ *                   loginType: { type: integer }
+ *                   comments: { type: string }
+ *                   createTime: { type: string, format: date-time }
+ *                   nickname: { type: string }
  */
-const getLoginLogById = async (req, res, next) => {
+const getLoginLogs = async (req, res, next) => {
   try {
-    const { id } = req.params;
+    const query = buildLoginLogQuery(req.query);
+    const list = await LoginLog.find(query).sort({ createdAt: -1 }).lean();
 
-    const log = await LoginLog.findById(id).lean();
+    const usernames = [...new Set(list.map(l => l.username).filter(Boolean))];
+    const users = usernames.length
+      ? await User.find({ username: { $in: usernames } }, 'username nickname').lean()
+      : [];
+    const userMap = new Map(users.map(u => [u.username, u]));
 
-    if (!log) {
-      return response.notFound(res, '登录日志不存在');
-    }
-
-    return response.success(res, log);
+    return response.success(res, list.map(l => formatLoginLog(l, userMap)));
   } catch (error) {
     next(error);
   }
@@ -193,65 +233,129 @@ const getLoginLogById = async (req, res, next) => {
  *   delete:
  *     tags: [Logs]
  *     summary: 清理登录日志
- *     description: 根据时间范围批量删除登录日志，未指定范围将清空所有日志。仅限管理员操作。
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: false
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               startDate:
- *                 type: string
- *                 format: date-time
- *                 description: 起始时间（包含）
- *               endDate:
- *                 type: string
- *                 format: date-time
- *                 description: 结束时间（包含）
+ *               createTimeStart: { type: string, format: date-time }
+ *               createTimeEnd: { type: string, format: date-time }
  *     responses:
  *       200:
- *         description: 清理成功
+ *         description: 成功
  *         content:
  *           application/json:
  *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: object
- *                       properties:
- *                         deletedCount:
- *                           type: integer
- *                           example: 100
- *                           description: 被删除的日志条数
- *                     message:
- *                       type: string
- *                       example: '清理成功'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 deletedCount: { type: integer }
  */
 const clearLoginLogs = async (req, res, next) => {
   try {
-    const { startDate, endDate } = req.body;
-
+    const { createTimeStart, createTimeEnd } = req.body || {};
     const query = {};
-    if (startDate || endDate) {
-      query.loginTime = {};
-      if (startDate) query.loginTime.$gte = new Date(startDate);
-      if (endDate) query.loginTime.$lte = new Date(endDate);
+    if (createTimeStart || createTimeEnd) {
+      query.createdAt = {};
+      if (createTimeStart) query.createdAt.$gte = new Date(createTimeStart);
+      if (createTimeEnd) query.createdAt.$lte = new Date(createTimeEnd);
     }
-
     const result = await LoginLog.deleteMany(query);
-
     return response.success(res, { deletedCount: result.deletedCount }, '清理成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
+/**
+ * @swagger
+ * /api/v1/logs/operation-logs/page:
+ *   get:
+ *     tags: [Logs]
+ *     summary: 分页查询操作日志
+ *     security:
+ *       - bearerAuth: []
+ *     parameters:
+ *       - in: query
+ *         name: page
+ *         schema: { type: integer, default: 1 }
+ *       - in: query
+ *         name: limit
+ *         schema: { type: integer, default: 20 }
+ *       - in: query
+ *         name: username
+ *         schema: { type: string }
+ *         description: 用户账号
+ *       - in: query
+ *         name: module
+ *         schema: { type: string }
+ *         description: 操作模块
+ *       - in: query
+ *         name: status
+ *         schema: { type: integer, enum: [0, 1] }
+ *         description: 状态, 0成功, 1异常
+ *       - in: query
+ *         name: createTimeStart
+ *         schema: { type: string, format: date-time }
+ *         description: 开始时间
+ *       - in: query
+ *         name: createTimeEnd
+ *         schema: { type: string, format: date-time }
+ *         description: 截止时间
+ *     responses:
+ *       200:
+ *         description: 成功
+ *         content:
+ *           application/json:
+ *             schema:
+ *               type: object
+ *               properties:
+ *                 list:
+ *                   type: array
+ *                   items:
+ *                     type: object
+ *                     properties:
+ *                       id: { type: string }
+ *                       userId: { type: string }
+ *                       username: { type: string }
+ *                       nickname: { type: string }
+ *                       traceId: { type: string, description: 全链路追踪 ID }
+ *                       module: { type: string }
+ *                       businessType: { type: string, enum: [INSERT, UPDATE, DELETE, GRANT, EXPORT, IMPORT, CLEAN, OTHER], description: 业务类型 }
+ *                       description: { type: string }
+ *                       url: { type: string }
+ *                       requestMethod: { type: string }
+ *                       method: { type: string }
+ *                       params: { type: string }
+ *                       result: { type: string }
+ *                       error: { type: string }
+ *                       spendTime: { type: integer }
+ *                       os: { type: string }
+ *                       device: { type: string }
+ *                       browser: { type: string }
+ *                       ip: { type: string }
+ *                       location: { type: string, description: IP 归属地 }
+ *                       status: { type: integer }
+ *                       createTime: { type: string, format: date-time }
+ *                 count: { type: integer }
+ */
+const getOperationLogsPage = async (req, res, next) => {
+  try {
+    const { page = 1, limit = 20, ...filters } = req.query;
+    const query = await buildOperationLogQuery(filters);
+    const skip = (Number(page) - 1) * Number(limit);
+    const [list, count] = await Promise.all([
+      OperationLog.find(query)
+        .populate('userId', 'username nickname')
+        .sort({ createdAt: -1 })
+        .skip(skip)
+        .limit(Number(limit))
+        .lean(),
+      OperationLog.countDocuments(query)
+    ]);
+    return response.success(res, { list: list.map(l => formatOperationLog(l)), count });
   } catch (error) {
     next(error);
   }
@@ -262,177 +366,71 @@ const clearLoginLogs = async (req, res, next) => {
  * /api/v1/logs/operation-logs:
  *   get:
  *     tags: [Logs]
- *     summary: 获取操作日志列表
- *     description: 分页获取操作日志，支持按模块、操作人、状态、时间范围过滤
+ *     summary: 查询操作日志列表（不分页）
  *     security:
  *       - bearerAuth: []
  *     parameters:
  *       - in: query
- *         name: page
- *         schema:
- *           type: integer
- *           default: 1
- *         description: 页码
- *       - in: query
- *         name: pageSize
- *         schema:
- *           type: integer
- *           default: 20
- *           maximum: 100
- *         description: 每页记录数（最大 100）
+ *         name: username
+ *         schema: { type: string }
+ *         description: 用户账号
  *       - in: query
  *         name: module
- *         schema:
- *           type: string
- *         description: 模块名模糊搜索
- *       - in: query
- *         name: operator
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 操作人用户 ID
+ *         schema: { type: string }
+ *         description: 操作模块
  *       - in: query
  *         name: status
- *         schema:
- *           type: string
- *           enum: [success, fail]
- *         description: 操作结果
+ *         schema: { type: integer, enum: [0, 1] }
+ *         description: 状态, 0成功, 1异常
  *       - in: query
- *         name: startDate
- *         schema:
- *           type: string
- *           format: date-time
- *         description: 起始时间（ISO 8601）
+ *         name: createTimeStart
+ *         schema: { type: string, format: date-time }
+ *         description: 开始时间
  *       - in: query
- *         name: endDate
- *         schema:
- *           type: string
- *           format: date-time
- *         description: 结束时间（ISO 8601）
- *       - in: query
- *         name: sortField
- *         schema:
- *           type: string
- *           default: operationTime
- *           enum: [operationTime, module, status, createdAt]
- *         description: 排序字段
- *       - in: query
- *         name: sortOrder
- *         schema:
- *           type: string
- *           default: desc
- *           enum: [asc, desc]
- *         description: 排序方式
+ *         name: createTimeEnd
+ *         schema: { type: string, format: date-time }
+ *         description: 截止时间
  *     responses:
  *       200:
- *         description: 成功获取操作日志列表
+ *         description: 成功
  *         content:
  *           application/json:
  *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: object
- *                       properties:
- *                         list:
- *                           type: array
- *                           items:
- *                             $ref: '#/components/schemas/OperationLog'
- *                         pagination:
- *                           $ref: '#/components/schemas/Pagination'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *               type: array
+ *               items:
+ *                 type: object
+ *                 properties:
+ *                   id: { type: string }
+ *                   userId: { type: string }
+ *                   username: { type: string }
+ *                   nickname: { type: string }
+ *                   traceId: { type: string, description: 全链路追踪 ID }
+ *                   module: { type: string }
+ *                   businessType: { type: string, enum: [INSERT, UPDATE, DELETE, GRANT, EXPORT, IMPORT, CLEAN, OTHER], description: 业务类型 }
+ *                   description: { type: string }
+ *                   url: { type: string }
+ *                   requestMethod: { type: string }
+ *                   method: { type: string }
+ *                   params: { type: string }
+ *                   result: { type: string }
+ *                   error: { type: string }
+ *                   spendTime: { type: integer }
+ *                   os: { type: string }
+ *                   device: { type: string }
+ *                   browser: { type: string }
+ *                   ip: { type: string }
+ *                   location: { type: string, description: IP 归属地 }
+ *                   status: { type: integer }
+ *                   createTime: { type: string, format: date-time }
  */
 const getOperationLogs = async (req, res, next) => {
   try {
-    const { page = 1, pageSize = 20, module, operator, status, startDate, endDate, sortField = 'operationTime', sortOrder = 'desc' } = req.query;
-
-    const query = {};
-
-    if (module) query.module = new RegExp(module, 'i');
-    if (operator) query.operator = operator;
-    if (status) query.status = status;
-    if (startDate || endDate) {
-      query.operationTime = {};
-      if (startDate) query.operationTime.$gte = new Date(startDate);
-      if (endDate) query.operationTime.$lte = new Date(endDate);
-    }
-
-    const limit = Math.min(parseInt(pageSize, 10) || 20, 100);
-    const skip = (parseInt(page, 10) - 1) * limit;
-
-    const sortObj = {};
-    sortObj[sortField] = sortOrder === 'asc' ? 1 : -1;
-
-    const [list, total] = await Promise.all([
-      OperationLog.find(query)
-        .populate('operator', 'username name')
-        .sort(sortObj)
-        .skip(skip)
-        .limit(limit)
-        .lean(),
-      OperationLog.countDocuments(query)
-    ]);
-
-    return response.paginated(res, { list, total, page, pageSize });
-  } catch (error) {
-    next(error);
-  }
-};
-
-/**
- * @swagger
- * /api/v1/logs/operation-logs/{id}:
- *   get:
- *     tags: [Logs]
- *     summary: 获取单条操作日志
- *     description: 根据 ID 获取操作日志详情
- *     security:
- *       - bearerAuth: []
- *     parameters:
- *       - in: path
- *         name: id
- *         required: true
- *         schema:
- *           type: string
- *           format: ObjectId
- *         description: 日志 ID
- *     responses:
- *       200:
- *         description: 成功获取操作日志详情
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/OperationLog'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       404:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
- */
-const getOperationLogById = async (req, res, next) => {
-  try {
-    const { id } = req.params;
-
-    const log = await OperationLog.findById(id)
-      .populate('operator', 'username name')
+    const query = await buildOperationLogQuery(req.query);
+    const list = await OperationLog.find(query)
+      .populate('userId', 'username nickname')
+      .sort({ createdAt: -1 })
       .lean();
-
-    if (!log) {
-      return response.notFound(res, '操作日志不存在');
-    }
-
-    return response.success(res, log);
+    return response.success(res, list.map(l => formatOperationLog(l)));
   } catch (error) {
     next(error);
   }
@@ -444,64 +442,36 @@ const getOperationLogById = async (req, res, next) => {
  *   delete:
  *     tags: [Logs]
  *     summary: 清理操作日志
- *     description: 根据时间范围批量删除操作日志，未指定范围将清空所有日志。仅限管理员操作。
  *     security:
  *       - bearerAuth: []
  *     requestBody:
- *       required: false
  *       content:
  *         application/json:
  *           schema:
  *             type: object
  *             properties:
- *               startDate:
- *                 type: string
- *                 format: date-time
- *                 description: 起始时间（包含）
- *               endDate:
- *                 type: string
- *                 format: date-time
- *                 description: 结束时间（包含）
+ *               createTimeStart: { type: string, format: date-time }
+ *               createTimeEnd: { type: string, format: date-time }
  *     responses:
  *       200:
- *         description: 清理成功
+ *         description: 成功
  *         content:
  *           application/json:
  *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       type: object
- *                       properties:
- *                         deletedCount:
- *                           type: integer
- *                           example: 50
- *                           description: 被删除的日志条数
- *                     message:
- *                       type: string
- *                       example: '清理成功'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       403:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
+ *               type: object
+ *               properties:
+ *                 deletedCount: { type: integer }
  */
 const clearOperationLogs = async (req, res, next) => {
   try {
-    const { startDate, endDate } = req.body;
-
+    const { createTimeStart, createTimeEnd } = req.body || {};
     const query = {};
-    if (startDate || endDate) {
-      query.operationTime = {};
-      if (startDate) query.operationTime.$gte = new Date(startDate);
-      if (endDate) query.operationTime.$lte = new Date(endDate);
+    if (createTimeStart || createTimeEnd) {
+      query.createdAt = {};
+      if (createTimeStart) query.createdAt.$gte = new Date(createTimeStart);
+      if (createTimeEnd) query.createdAt.$lte = new Date(createTimeEnd);
     }
-
     const result = await OperationLog.deleteMany(query);
-
     return response.success(res, { deletedCount: result.deletedCount }, '清理成功');
   } catch (error) {
     next(error);
@@ -509,10 +479,10 @@ const clearOperationLogs = async (req, res, next) => {
 };
 
 module.exports = {
+  getLoginLogsPage,
   getLoginLogs,
-  getLoginLogById,
   clearLoginLogs,
+  getOperationLogsPage,
   getOperationLogs,
-  getOperationLogById,
   clearOperationLogs
 };

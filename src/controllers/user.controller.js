@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Role = require('../models/Role');
 const Menu = require('../models/Menu');
 const Organization = require('../models/Organization');
+const DictionaryItem = require('../models/DictionaryItem');
 const bcrypt = require('bcryptjs');
 const xlsx = require('xlsx');
 const response = require('../utils/response');
@@ -217,19 +218,37 @@ const importUsers = async (req, res, next) => {
     const rows = xlsx.utils.sheet_to_json(sheet);
     if (!rows.length) return response.badRequest(res, '文件内容为空');
 
+    // 预加载字典/角色/机构，避免每行重复查询
+    const sexItems = await DictionaryItem.find({ dictCode: 'sex' }).lean();
+    const sexMap = Object.fromEntries(sexItems.map(i => [i.dictDataName, i.dictDataCode]));
+    const allRoles = await Role.find({}).lean();
+    const roleMap = Object.fromEntries(allRoles.map(r => [r.roleName, r._id]));
+    const allOrgs = await Organization.find({}).lean();
+    const orgMap = Object.fromEntries(allOrgs.map(o => [o.organizationName, o._id]));
+
     const results = { success: 0, failed: 0, errors: [] };
     for (const row of rows) {
       try {
-        const username = row['账号'] || row['username'];
+        const username = row['登录账号'] || row['账号'] || row['username'];
         if (!username) { results.failed++; results.errors.push('缺少账号'); continue; }
         if (await User.findOne({ username }).lean()) { results.failed++; results.errors.push(`${username} 已存在`); continue; }
+
+        const sexName = row['性别'] || row['sex'] || '';
+        const roleName = row['角色'] || '';
+        const orgName = row['组织机构'] || '';
+
+        const roleId = roleMap[roleName];
+        const orgId = orgMap[orgName];
+
         await User.create({
           username,
-          nickname: row['昵称'] || row['nickname'],
-          phone: row['手机号'] || row['phone'],
+          nickname: row['用户名'] || row['昵称'] || row['nickname'],
+          phone: String(row['手机号'] || row['phone'] || ''),
           email: row['邮箱'] || row['email'],
-          sex: row['性别'] || row['sex'],
-          password: row['密码'] || row['password'] || '123456',
+          sex: sexMap[sexName] || sexName,
+          password: String(row['登录密码'] || row['密码'] || row['password'] || '123456'),
+          organizationId: orgId || null,
+          roles: roleId ? [roleId] : [],
           status: 0
         });
         results.success++;

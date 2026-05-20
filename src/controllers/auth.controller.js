@@ -1,10 +1,32 @@
 const crypto = require('crypto');
 const svgCaptcha = require('svg-captcha');
 const User = require('../models/User');
+const Menu = require('../models/Menu');
+const Organization = require('../models/Organization');
+const DictionaryItem = require('../models/DictionaryItem');
 const LoginLog = require('../models/LoginLog');
 const { generateToken } = require('../utils/jwt');
 const response = require('../utils/response');
 const captchaStore = require('../utils/captchaStore');
+const { formatRole, formatMenu } = require('../utils/formatters');
+const { parseUA } = require('../middlewares/logger.middleware');
+const { lookupLocation } = require('../utils/ipLocation');
+
+const buildLoginLog = (req, { username, nickname, loginType, comments }) => {
+  const ua = parseUA(req.get('user-agent') || '');
+  const ip = req.ip;
+  return {
+    username: username || 'unknown',
+    nickname: nickname || '',
+    os: ua.os,
+    device: ua.device,
+    browser: ua.browser,
+    ip,
+    location: lookupLocation(ip),
+    loginType,
+    comments: comments || ''
+  };
+};
 
 /**
  * @swagger
@@ -51,60 +73,36 @@ const login = async (req, res, next) => {
     const { username, password, captchaId, captchaCode } = req.body;
 
     if (!captchaStore.verify(captchaId, captchaCode)) {
+      await LoginLog.create(buildLoginLog(req, { username: username || 'unknown', loginType: 1, comments: '验证码错误或已过期' }));
       return response.badRequest(res, '验证码错误或已过期');
     }
 
     if (!username || !password) {
-      await LoginLog.create({
-        username: username || 'unknown',
-        loginType: 'login_fail',
-        status: 'fail',
-        ip: req.ip
-      });
+      await LoginLog.create(buildLoginLog(req, { username, loginType: 1, comments: '用户名或密码为空' }));
       return response.badRequest(res, '用户名和密码不能为空');
     }
 
     const user = await User.findOne({ username }).populate('roles');
 
     if (!user) {
-      await LoginLog.create({
-        username,
-        loginType: 'login_fail',
-        status: 'fail',
-        ip: req.ip
-      });
+      await LoginLog.create(buildLoginLog(req, { username, loginType: 1, comments: '用户不存在' }));
       return response.unauthorized(res, '用户名或密码错误');
     }
 
     const isMatch = await user.comparePassword(password);
 
     if (!isMatch) {
-      await LoginLog.create({
-        username,
-        loginType: 'login_fail',
-        status: 'fail',
-        ip: req.ip
-      });
+      await LoginLog.create(buildLoginLog(req, { username, nickname: user.nickname, loginType: 1, comments: '密码错误' }));
       return response.unauthorized(res, '用户名或密码错误');
     }
 
     if (user.status === 'inactive') {
-      await LoginLog.create({
-        username,
-        loginType: 'login_fail',
-        status: 'fail',
-        ip: req.ip
-      });
+      await LoginLog.create(buildLoginLog(req, { username, nickname: user.nickname, loginType: 1, comments: '用户已禁用' }));
       return response.unauthorized(res, '用户已被禁用');
     }
 
     if (user.status === 'locked') {
-      await LoginLog.create({
-        username,
-        loginType: 'login_fail',
-        status: 'fail',
-        ip: req.ip
-      });
+      await LoginLog.create(buildLoginLog(req, { username, nickname: user.nickname, loginType: 1, comments: '用户已锁定' }));
       return response.unauthorized(res, '用户已被锁定');
     }
 
@@ -113,13 +111,7 @@ const login = async (req, res, next) => {
       username: user.username
     });
 
-    await LoginLog.create({
-      username: user.username,
-      loginType: 'login_success',
-      status: 'success',
-      ip: req.ip,
-      device: req.get('user-agent')
-    });
+    await LoginLog.create(buildLoginLog(req, { username: user.username, nickname: user.nickname, loginType: 0, comments: '登录成功' }));
 
     return response.success(res, {
       token,
@@ -159,62 +151,74 @@ const login = async (req, res, next) => {
  */
 const logout = async (req, res, next) => {
   try {
+    if (req.user) {
+      await LoginLog.create(buildLoginLog(req, {
+        username: req.user.username,
+        nickname: req.user.nickname,
+        loginType: 2,
+        comments: '退出登录'
+      }));
+    }
     return response.success(res, null, '登出成功');
   } catch (error) {
     next(error);
   }
 };
 
-/**
- * @swagger
- * /api/v1/auth/current-user:
- *   get:
- *     tags: [Authentication]
- *     summary: 获取当前用户信息
- *     description: 获取当前登录用户的详细信息，包括角色和权限
- *     security:
- *       - bearerAuth: []
- *     responses:
- *       200:
- *         description: 成功获取用户信息
- *         content:
- *           application/json:
- *             schema:
- *               allOf:
- *                 - $ref: '#/components/schemas/StandardResponse'
- *                 - type: object
- *                   properties:
- *                     data:
- *                       $ref: '#/components/schemas/User'
- *       401:
- *         $ref: '#/components/schemas/Error'
- *       500:
- *         $ref: '#/components/schemas/Error'
- */
 const getCurrentUser = async (req, res, next) => {
   try {
     const user = req.user;
 
-    const seenIds = new Set();
-    const authorities = user.roles.flatMap(role => role.permissions || []).filter(p => {
-      const id = p._id.toString();
-      if (seenIds.has(id)) return false;
-      seenIds.add(id);
-      return true;
-    });
+    const isSuperAdmin = user.roles.some(r => r.roleCode === 'ADMIN');
+    let authorityMenus;
+    if (isSuperAdmin) {
+      authorityMenus = await Menu.find({}).sort({ sortNumber: 1 }).lean();
+    } else {
+      const menuIds = [...new Set(
+        user.roles.flatMap(r => (r.menus || []).map(id => id.toString()))
+      )];
+      authorityMenus = menuIds.length
+        ? await Menu.find({ _id: { $in: menuIds } }).sort({ sortNumber: 1 }).lean()
+        : [];
+    }
+
+    let organizationName = '';
+    if (user.organizationId) {
+      const org = await Organization.findById(user.organizationId)
+        .select('organizationName')
+        .lean();
+      organizationName = org ? org.organizationName : '';
+    }
+
+    let sexName = '';
+    if (user.sex) {
+      const item = await DictionaryItem.findOne({
+        dictCode: 'sex',
+        dictDataCode: user.sex
+      }).lean();
+      sexName = item ? item.dictDataName : '';
+    }
 
     return response.success(res, {
-      id: user._id,
+      userId: user._id,
       username: user.username,
-      name: user.name,
-      sex: user.sex,
-      email: user.email,
-      phone: user.phone,
-      birthday: user.birthday,
-      remark: user.remark,
-      roles: user.roles,
-      authorities,
-      organization: user.organization
+      nickname: user.nickname || '',
+      avatar: user.avatar || '',
+      sex: user.sex || '',
+      sexName,
+      phone: user.phone || '',
+      email: user.email || '',
+      birthday: user.birthday || null,
+      introduction: user.introduction || '',
+      organizationId: user.organizationId || '',
+      organizationName,
+      status: user.status,
+      address: user.address || '',
+      tellPre: user.tellPre || '',
+      tell: user.tell || '',
+      roles: user.roles.map(r => formatRole(r.toObject ? r.toObject() : r)),
+      authorities: authorityMenus.map(formatMenu),
+      createTime: user.createdAt
     });
   } catch (error) {
     next(error);
@@ -260,12 +264,12 @@ const refreshToken = async (req, res, next) => {
       username: user.username
     });
 
-    await LoginLog.create({
+    await LoginLog.create(buildLoginLog(req, {
       username: user.username,
-      loginType: 'refresh_token',
-      status: 'success',
-      ip: req.ip
-    });
+      nickname: user.nickname,
+      loginType: 3,
+      comments: '续签 token'
+    }));
 
     return response.success(res, { token });
   } catch (error) {
