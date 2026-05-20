@@ -40,23 +40,34 @@ express_mongoodb/
 │   ├── config/
 │   │   ├── index.js                    # 配置（DB / JWT / 日志）
 │   │   ├── swagger.js                  # Swagger 配置
-│   │   └── swagger-simple.js
+│   │   └── swagger-simple.js           # 简化版 Swagger 配置
 │   ├── routes/
 │   │   ├── index.js                    # 路由汇总
 │   │   ├── auth.routes.js              # 认证（含验证码、登录限流）
-│   │   ├── user.routes.js
-│   │   ├── role.routes.js
-│   │   ├── menu.routes.js
-│   │   ├── organization.routes.js
-│   │   ├── dictionary.routes.js
-│   │   ├── file.routes.js
+│   │   ├── user.routes.js              # 用户管理
+│   │   ├── role.routes.js              # 角色管理
+│   │   ├── menu.routes.js              # 菜单管理
+│   │   ├── organization.routes.js      # 机构管理
+│   │   ├── dictionary.routes.js        # 字典管理
+│   │   ├── file.routes.js              # 文件管理
 │   │   └── log.routes.js               # 登录/操作日志
 │   ├── controllers/                    # 控制器层
+│   │   ├── auth.controller.js
+│   │   ├── user.controller.js
+│   │   ├── role.controller.js
+│   │   ├── menu.controller.js
+│   │   ├── organization.controller.js
+│   │   ├── dictionary.controller.js
+│   │   ├── file.controller.js
+│   │   └── log.controller.js
 │   ├── models/
-│   │   ├── User.js / Role.js / Menu.js
-│   │   ├── Organization.js
-│   │   ├── Dictionary.js / DictionaryItem.js
-│   │   ├── File.js
+│   │   ├── User.js                     # 用户模型
+│   │   ├── Role.js                     # 角色模型
+│   │   ├── Menu.js                     # 菜单模型
+│   │   ├── Organization.js             # 机构模型
+│   │   ├── Dictionary.js               # 字典模型
+│   │   ├── DictionaryItem.js           # 字典项模型
+│   │   ├── File.js                     # 文件模型
 │   │   ├── LoginLog.js                 # 登录日志（TTL 索引）
 │   │   └── OperationLog.js             # 操作日志（TTL 索引 + businessType + traceId + location）
 │   ├── middlewares/
@@ -67,21 +78,23 @@ express_mongoodb/
 │   ├── utils/
 │   │   ├── response.js                 # 统一响应 + 全局时间格式化
 │   │   ├── formatters.js               # role/menu 输出格式化
-│   │   ├── jwt.js
-│   │   ├── password.js
+│   │   ├── jwt.js                      # JWT 工具函数
+│   │   ├── password.js                 # 密码工具函数
 │   │   ├── captchaStore.js             # 验证码内存存储
 │   │   ├── ipLocation.js               # IP 归属地解析
 │   │   └── operationLogQueue.js        # 操作日志内存队列 + 批量 insertMany
 │   ├── scripts/
 │   │   ├── init-data.js                # 初始化数据
 │   │   └── cleanup-legacy-fields.js    # 历史字段清理
-│   └── uploads/                        # 文件上传目录
+│   └── uploads/                        # 文件上传目录（运行时自动创建）
 ├── docker/
-│   └── Dockerfile
-├── docker-compose.yml
-├── pm2.config.js
+│   └── Dockerfile                      # Docker 构建文件
+├── .github/workflows/
+│   └── deploy.yml                      # GitHub Actions 部署配置
+├── docker-compose.yml                  # Docker Compose 配置
+├── pm2.config.js                       # PM2 进程管理配置
 ├── package.json
-├── .env.example
+├── .env.example                        # 环境变量模板
 └── README.md
 ```
 
@@ -110,9 +123,9 @@ API 统一前缀：`/api/v1`
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET    | `/page` | 分页查询 |
+| GET    | `/page` | 分页查询（参数：`page`, `limit`, `username`, `nickname`, `sex`, `phone`, `email`, `status`, `organizationId`, `createTimeStart`, `createTimeEnd`） |
 | GET    | `/` | 不分页列表 |
-| GET    | `/existence` | 用户名/手机/邮箱重复校验 |
+| GET    | `/existence` | 用户名/手机/邮箱重复校验（参数：`field`, `value`, `id`） |
 | GET    | `/:id` | 详情 |
 | POST   | `/` | 新增（ADMIN） |
 | POST   | `/import` | Excel 批量导入（ADMIN） |
@@ -126,7 +139,9 @@ API 统一前缀：`/api/v1`
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/page` / `/` / `/:id` | 查询 |
+| GET | `/page` | 分页查询 |
+| GET | `/` | 不分页列表 |
+| GET | `/:id` | 详情 |
 | POST | `/` | 新增（ADMIN） |
 | PUT | `/:id` | 修改（ADMIN） |
 | PUT | `/:id/menus` | 分配菜单权限（ADMIN） |
@@ -140,24 +155,40 @@ API 统一前缀：`/api/v1`
 |------|------|------|
 | GET | `/` | 树形菜单 |
 | GET | `/:id` | 详情 |
-| POST / PUT / DELETE | `/...` | 维护（ADMIN） |
+| POST | `/` | 新增（ADMIN） |
+| PUT | `/:id` | 修改（ADMIN） |
+| DELETE | `/:id` | 删除（ADMIN） |
 
 菜单类型 `menuType`：0 目录 / 1 菜单 / 2 外链
 
 ### 5. 机构管理 `/api/v1/organizations`
 
-树形组织架构，支持 公司 / 部门 / 小组 多层级。
+树形组织架构，支持公司 / 部门 / 小组多层级。
+
+| 方法 | 路径 | 说明 |
+|------|------|------|
+| GET | `/` | 树形结构 |
+| GET | `/:id` | 详情 |
+| POST | `/` | 新增 |
+| PUT | `/:id` | 修改 |
+| DELETE | `/:id` | 删除 |
 
 ### 6. 字典管理 `/api/v1/dictionaries`
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/` / `/page` | 字典分类查询 |
+| GET | `/` | 字典分类列表 |
+| GET | `/page` | 字典分类分页 |
 | GET | `/:code/items` | 字典项查询 |
 | GET | `/data?dictCode=xxx` | 通过编码取字典数据 |
-| POST / PUT / DELETE | `/...` | 维护 |
+| POST | `/` | 新增字典 |
+| PUT | `/:id` | 修改字典 |
+| DELETE | `/:id` | 删除字典 |
+| POST | `/:dictId/items` | 新增字典项 |
+| PUT | `/items/:id` | 修改字典项 |
+| DELETE | `/items/:id` | 删除字典项 |
 
-预置字典：性别（sex）、机构类型（organization_type）、状态等。
+预置字典：性别（sex）、机构类型（organization_type）、状态（status）等。
 
 ### 7. 文件管理 `/api/v1/files`
 
@@ -175,9 +206,9 @@ API 统一前缀：`/api/v1`
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/login-logs/page` | 分页查询 |
+| GET | `/login-logs/page` | 分页查询（参数：`page`, `limit`, `username`, `nickname`, `loginType`, `createTimeStart`, `createTimeEnd`） |
 | GET | `/login-logs` | 不分页查询 |
-| DELETE | `/login-logs` | 清理（ADMIN） |
+| DELETE | `/login-logs` | 清理（ADMIN，支持时间范围筛选） |
 
 `loginType`：0 登录成功 / 1 登录失败 / 2 退出登录 / 3 续签 Token
 
@@ -185,9 +216,9 @@ API 统一前缀：`/api/v1`
 
 | 方法 | 路径 | 说明 |
 |------|------|------|
-| GET | `/operation-logs/page` | 分页查询 |
+| GET | `/operation-logs/page` | 分页查询（参数：`page`, `limit`, `username`, `module`, `status`, `createTimeStart`, `createTimeEnd`） |
 | GET | `/operation-logs` | 不分页查询 |
-| DELETE | `/operation-logs` | 清理（ADMIN） |
+| DELETE | `/operation-logs` | 清理（ADMIN，支持时间范围筛选） |
 
 `businessType`：`INSERT` / `UPDATE` / `DELETE` / `GRANT` / `EXPORT` / `IMPORT` / `CLEAN` / `OTHER`
 
@@ -273,7 +304,7 @@ router.post('/heartbeat',audit({ skip: true }),                                 
   "message": "查询成功",
   "data": {
     "list": [],
-    "pagination": { "total": 100, "page": 1, "pageSize": 20, "totalPages": 5 }
+    "count": 100
   }
 }
 ```
@@ -302,7 +333,6 @@ npm install
 
 cp .env.example .env       # 按需修改
 
-# 启动 MongoDB（本机或 Docker）
 docker run -d -p 27017:27017 --name mongodb mongo:6
 
 npm run init-data           # 初始化基础数据
@@ -337,7 +367,7 @@ pm2 startup
 | NODE_ENV | development | 运行环境 |
 | PORT | 3000 | 服务端口 |
 | MONGODB_URI | mongodb://localhost:27017/ele_admin | MongoDB 连接 |
-| JWT_SECRET | default-secret-change-me | JWT 密钥（生产必须修改） |
+| JWT_SECRET | your-super-secret-jwt-key-change-in-production | JWT 密钥（生产必须修改） |
 | JWT_EXPIRES_IN | 7d | Token 过期时间 |
 | CORS_ORIGIN | * | CORS 白名单 |
 | LOG_RETENTION_DAYS | 30 | 日志 TTL（天） |
@@ -378,6 +408,7 @@ pm2 startup
 | roleName | String | 名称 |
 | roleCode | String | 编码（唯一，自动大写） |
 | menus | [ObjectId] | 关联菜单 |
+| comments | String | 备注 |
 
 ### Menu
 

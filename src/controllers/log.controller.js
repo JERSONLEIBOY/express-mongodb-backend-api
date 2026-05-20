@@ -13,7 +13,7 @@ const formatLoginLog = (log, userMap) => ({
   location: log.location ?? '',
   loginType: log.loginType ?? 0,
   comments: log.comments ?? '',
-  createTime: log.createdAt,
+  createTime: log.createdAt ? new Date(log.createdAt).toISOString() : '',
   nickname: log.nickname || (userMap?.get(log.username)?.nickname ?? '')
 });
 
@@ -43,7 +43,7 @@ const formatOperationLog = (log, userMap) => {
     ip: log.ip ?? '',
     location: log.location ?? '',
     status: log.status ?? 0,
-    createTime: log.createdAt
+    createTime: log.createdAt ? new Date(log.createdAt).toISOString() : ''
   };
 };
 
