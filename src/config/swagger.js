@@ -16,12 +16,8 @@ const options = {
     },
     servers: [
       {
-        url: `http://localhost:${process.env.PORT || 3000}`,
-        description: '开发服务器'
-      },
-      {
-        url: 'https://your-production-domain.com',
-        description: '生产服务器'
+        url: process.env.SERVER_URL || `http://localhost:${process.env.PORT || 3000}`,
+        description: '当前服务器'
       }
     ],
     components: {

@@ -49,8 +49,7 @@ app.get('/', (req, res) => {
 });
 
 // API 文档端点
-app.use('/api-docs', swaggerUi.serve);
-app.get('/api-docs', swaggerUi.setup(specs));
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 app.use(operationLogger);
 
