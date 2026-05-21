@@ -15,7 +15,12 @@ const { swaggerUi, specs } = require('./config/swagger');
 
 const app = express();
 
-app.use(helmet());
+app.use((req, res, next) => {
+  if (req.path.startsWith('/api-docs')) {
+    return helmet({ contentSecurityPolicy: false, crossOriginOpenerPolicy: false })(req, res, next);
+  }
+  return helmet()(req, res, next);
+});
 
 app.use(cors({
   origin: config.cors.origin,
@@ -48,11 +53,8 @@ app.get('/', (req, res) => {
   });
 });
 
-// API 文档端点（关闭 CSP 避免静态资源被升级为 https）
-app.use('/api-docs', (req, res, next) => {
-  res.removeHeader('Content-Security-Policy');
-  next();
-}, swaggerUi.serve, swaggerUi.setup(specs));
+// API 文档端点
+app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
 app.use(operationLogger);
 
