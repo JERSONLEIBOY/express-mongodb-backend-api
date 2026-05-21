@@ -48,8 +48,11 @@ app.get('/', (req, res) => {
   });
 });
 
-// API 文档端点
-app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
+// API 文档端点（关闭 CSP 避免静态资源被升级为 https）
+app.use('/api-docs', (req, res, next) => {
+  res.removeHeader('Content-Security-Policy');
+  next();
+}, swaggerUi.serve, swaggerUi.setup(specs));
 
 app.use(operationLogger);
 
