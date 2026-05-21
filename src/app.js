@@ -17,7 +17,7 @@ const app = express();
 
 app.use((req, res, next) => {
   if (req.path.startsWith('/api-docs')) {
-    return helmet({ contentSecurityPolicy: false, crossOriginOpenerPolicy: false })(req, res, next);
+    return helmet({ contentSecurityPolicy: false, crossOriginOpenerPolicy: false, strictTransportSecurity: false })(req, res, next);
   }
   return helmet()(req, res, next);
 });
