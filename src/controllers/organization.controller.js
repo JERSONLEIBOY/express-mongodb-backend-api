@@ -1,13 +1,20 @@
 const Organization = require('../models/Organization');
+const DictionaryItem = require('../models/DictionaryItem');
 const response = require('../utils/response');
 
-const formatOrg = (org) => ({
+const getOrgTypeMap = async () => {
+  const items = await DictionaryItem.find({ dictCode: 'organization_type' }).lean();
+  return Object.fromEntries(items.map(i => [i.dictDataCode, i.dictDataName]));
+};
+
+const formatOrg = (org, typeMap = {}) => ({
   organizationId: org._id,
   parentId: org.parentId ?? '0',
   organizationName: org.organizationName,
   organizationFullName: org.organizationFullName ?? null,
   organizationCode: org.organizationCode ?? null,
   organizationType: org.organizationType ?? null,
+  organizationTypeName: typeMap[org.organizationType] ?? null,
   sortNumber: org.sortNumber,
   comments: org.comments ?? null,
   createTime: org.createdAt
@@ -54,11 +61,12 @@ const getOrganizationsPage = async (req, res, next) => {
     const { page = 1, limit = 20, ...filters } = req.query;
     const query = buildQuery(filters);
     const skip = (Number(page) - 1) * Number(limit);
-    const [list, count] = await Promise.all([
+    const [list, count, typeMap] = await Promise.all([
       Organization.find(query).sort({ sortNumber: 1 }).skip(skip).limit(Number(limit)).lean(),
-      Organization.countDocuments(query)
+      Organization.countDocuments(query),
+      getOrgTypeMap()
     ]);
-    return response.success(res, { list: list.map(formatOrg), count });
+    return response.success(res, { list: list.map(o => formatOrg(o, typeMap)), count });
   } catch (error) {
     next(error);
   }
@@ -88,8 +96,11 @@ const getOrganizationsPage = async (req, res, next) => {
  */
 const getOrganizations = async (req, res, next) => {
   try {
-    const orgs = await Organization.find(buildQuery(req.query)).sort({ sortNumber: 1 }).lean();
-    return response.success(res, orgs.map(formatOrg));
+    const [orgs, typeMap] = await Promise.all([
+      Organization.find(buildQuery(req.query)).sort({ sortNumber: 1 }).lean(),
+      getOrgTypeMap()
+    ]);
+    return response.success(res, orgs.map(o => formatOrg(o, typeMap)));
   } catch (error) {
     next(error);
   }

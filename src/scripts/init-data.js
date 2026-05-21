@@ -44,22 +44,28 @@ const clearExistingData = async () => {
 const createOrganizations = async () => {
   const company = await Organization.create({
     organizationName: '总公司',
-    organizationType: 'company',
+    organizationType: '1',
+    organizationFullName: '总公司',
+    organizationTypeName: '公司',
     sortNumber: 1
   });
 
   const techDept = await Organization.create({
     organizationName: '技术部',
-    organizationType: 'department',
+    organizationType: '2',
+    organizationTypeName: '部门',
+    organizationFullName: '总公司部门-技术部',
     parentId: company._id.toString(),
-    sortNumber: 1
+    sortNumber: 2
   });
 
   const devTeam = await Organization.create({
     organizationName: '开发组',
-    organizationType: 'team',
+    organizationType: '3',
+    organizationTypeName: '小组',
+    organizationFullName: '总公司部门-技术部-开发组',
     parentId: techDept._id.toString(),
-    sortNumber: 1
+    sortNumber: 3
   });
 
   logger.info('Created organization structure');
@@ -90,6 +96,17 @@ const createDictionaries = async () => {
 };
 
 const createMenus = async () => {
+  const dashboardMenu = await Menu.create({
+    title: 'Dashboard',
+    menuType: 0,
+    path: '/dashboard',
+    parentId: '0',
+    sortNumber: 0,
+    icon: 'HomeOutlined',
+    hide: 0,
+    openType: 0
+  });
+
   const systemMenu = await Menu.create({
     title: '系统管理',
     menuType: 0,
@@ -98,21 +115,27 @@ const createMenus = async () => {
     sortNumber: 1,
     icon: 'SettingOutlined',
     hide: 0,
-    openType: 0
+    openType: 0,
+    meta: '{"lang":{"zh_TW":"系統管理","en":"System"}}'
   });
 
   const pid = systemMenu._id.toString();
+  const dashboardPid = dashboardMenu._id.toString();
+
+  const [workplaceMenu] = await Menu.insertMany([
+    { title: '工作台', menuType: 1, path: '/dashboard/workplace', parentId: dashboardPid, sortNumber: 1, icon: 'DesktopOutlined', hide: 0, openType: 0, component: '/dashboard/workplace', meta: '{"lang":{"zh_TW":"工作臺","en":"Workplace"}}' }
+  ]);
 
   const [userMenu, roleMenu, menuMenu, orgMenu, dictMenu, fileMenu, loginLogMenu, operationLogMenu] =
     await Menu.insertMany([
-      { title: '用户管理', menuType: 1, path: '/system/user',             parentId: pid, sortNumber: 1, icon: 'UserOutlined',     hide: 0, openType: 0, component: '/system/user' },
-      { title: '角色管理', menuType: 1, path: '/system/role',             parentId: pid, sortNumber: 2, icon: 'IdcardOutlined',   hide: 0, openType: 0, component: '/system/role' },
-      { title: '菜单管理', menuType: 1, path: '/system/menu',             parentId: pid, sortNumber: 3, icon: 'AppstoreOutlined', hide: 0, openType: 0, component: '/system/menu' },
-      { title: '机构管理', menuType: 1, path: '/system/organization',     parentId: pid, sortNumber: 4, icon: 'CityOutlined',     hide: 0, openType: 0, component: '/system/organization' },
-      { title: '字典管理', menuType: 1, path: '/system/dictionary',       parentId: pid, sortNumber: 5, icon: 'BookOutlined',     hide: 0, openType: 0, component: '/system/dictionary' },
-      { title: '文件管理', menuType: 1, path: '/system/file',             parentId: pid, sortNumber: 6, icon: 'FolderOutlined',   hide: 0, openType: 0, component: '/system/file' },
-      { title: '登录日志', menuType: 1, path: '/system/login-record',     parentId: pid, sortNumber: 7, icon: 'CalendarOutlined', hide: 0, openType: 0, component: '/system/login-record' },
-      { title: '操作日志', menuType: 1, path: '/system/operation-record', parentId: pid, sortNumber: 8, icon: 'LogOutlined',      hide: 0, openType: 0, component: '/system/operation-record' }
+      { title: '用户管理', menuType: 1, path: '/system/user',             parentId: pid, sortNumber: 1, icon: 'UserOutlined',     hide: 0, openType: 0, component: '/system/user', meta: '{"lang":{"zh_TW":"用戶管理","en":"User"}}' },
+      { title: '角色管理', menuType: 1, path: '/system/role',             parentId: pid, sortNumber: 2, icon: 'IdcardOutlined',   hide: 0, openType: 0, component: '/system/role', meta: '{"lang":{"zh_TW":"角色管理","en":"Role"}}' },
+      { title: '菜单管理', menuType: 1, path: '/system/menu',             parentId: pid, sortNumber: 3, icon: 'AppstoreOutlined', hide: 0, openType: 0, component: '/system/menu', meta: '{"lang":{"zh_TW":"選單管理","en":"Menu"}}' },
+      { title: '机构管理', menuType: 1, path: '/system/organization',     parentId: pid, sortNumber: 4, icon: 'CityOutlined',     hide: 0, openType: 0, component: '/system/organization', meta: '{"lang":{"zh_TW":"機构管理","en":"Organization"}}' },
+      { title: '字典管理', menuType: 1, path: '/system/dictionary',       parentId: pid, sortNumber: 5, icon: 'BookOutlined',     hide: 0, openType: 0, component: '/system/dictionary', meta: '{"hideFooter":true,"lang":{"zh_TW":"字典管理","en":"Dictionary"}}' },
+      { title: '文件管理', menuType: 1, path: '/system/file',             parentId: pid, sortNumber: 6, icon: 'FolderOutlined',   hide: 0, openType: 0, component: '/system/file', meta: '{"lang":{"zh_TW":"檔案管理","en":"File"}}' },
+      { title: '登录日志', menuType: 1, path: '/system/login-record',     parentId: pid, sortNumber: 7, icon: 'CalendarOutlined', hide: 0, openType: 0, component: '/system/login-record', meta: '{"lang":{"zh_TW":"登入日誌","en":"LoginRecord"}}' },
+      { title: '操作日志', menuType: 1, path: '/system/operation-record', parentId: pid, sortNumber: 8, icon: 'LogOutlined',      hide: 0, openType: 0, component: '/system/operation-record', meta: '{"lang":{"zh_TW":"操作日誌","en":"OperationRecord"}}' }
     ]);
 
   // 按钮级菜单（menuType: 2），authority 供前端权限指令使用
@@ -149,13 +172,14 @@ const createMenus = async () => {
     { title: '查看记录',   menuType: 2, openType: 0, parentId: fileMenu._id.toString(),      sortNumber: 3, authority: 'sys:file:list' },
   ]);
 
-  logger.info(`Created menus (${9 + buttons.length} total)`);
-  return { systemMenu, userMenu, roleMenu, menuMenu, orgMenu, dictMenu, fileMenu, loginLogMenu, operationLogMenu, buttons };
+  logger.info(`Created menus (${11 + buttons.length} total)`);
+  return { dashboardMenu, workplaceMenu, systemMenu, userMenu, roleMenu, menuMenu, orgMenu, dictMenu, fileMenu, loginLogMenu, operationLogMenu, buttons };
 };
 
 const createRoles = async (menus) => {
   const pageMenuIds = [
-    menus.systemMenu._id, menus.userMenu._id, menus.roleMenu._id, menus.menuMenu._id,
+    menus.dashboardMenu._id, menus.workplaceMenu._id, menus.systemMenu._id,
+    menus.userMenu._id, menus.roleMenu._id, menus.menuMenu._id,
     menus.orgMenu._id, menus.dictMenu._id, menus.fileMenu._id,
     menus.loginLogMenu._id, menus.operationLogMenu._id
   ];
