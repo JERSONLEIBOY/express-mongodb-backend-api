@@ -195,6 +195,20 @@ const updateUserStatus = async (req, res, next) => {
   }
 };
 
+const updateCurrentPassword = async (req, res, next) => {
+  try {
+    const { password, oldPassword } = req.body;
+    if (!oldPassword || !password) return response.badRequest(res, '原始密码和新密码不能为空');
+    if (password.length < 6) return response.badRequest(res, '新密码长度不能少于6位');
+    if (!await bcrypt.compare(oldPassword, req.user.password)) return response.badRequest(res, '原始密码错误');
+    req.user.password = password;
+    await req.user.save();
+    return response.success(res, null, '密码修改成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
 const resetUserPassword = async (req, res, next) => {
   try {
     const { id } = req.params;
@@ -288,6 +302,7 @@ module.exports = {
   deleteUserBatch,
   updateUserStatus,
   resetUserPassword,
+  updateCurrentPassword,
   importUsers,
   checkExistence
 };

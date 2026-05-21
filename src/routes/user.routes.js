@@ -54,6 +54,30 @@ router.use(authenticate);
  *       200:
  *         description: 成功
  */
+/**
+ * @swagger
+ * /api/v1/users/password:
+ *   put:
+ *     tags: [Users]
+ *     summary: 修改当前登录用户密码
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             required: [password, oldPassword]
+ *             properties:
+ *               oldPassword: { type: string, description: 原始密码 }
+ *               password: { type: string, minLength: 6, description: 新密码 }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.put('/password', userController.updateCurrentPassword);
+
 router.get('/page', userController.getUsersPage);
 
 /**
