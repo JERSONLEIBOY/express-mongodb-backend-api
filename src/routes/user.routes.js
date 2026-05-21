@@ -76,6 +76,37 @@ router.use(authenticate);
  *       200:
  *         description: 成功
  */
+/**
+ * @swagger
+ * /api/v1/users/profile:
+ *   put:
+ *     tags: [Users]
+ *     summary: 修改当前登录用户个人信息
+ *     security:
+ *       - bearerAuth: []
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               nickname: { type: string }
+ *               avatar: { type: string }
+ *               sex: { type: string }
+ *               phone: { type: string }
+ *               email: { type: string }
+ *               birthday: { type: string }
+ *               introduction: { type: string }
+ *               address: { type: string }
+ *               tellPre: { type: string }
+ *               tell: { type: string }
+ *     responses:
+ *       200:
+ *         description: 成功
+ */
+router.put('/profile', userController.updateCurrentProfile);
+
 router.put('/password', userController.updateCurrentPassword);
 
 router.get('/page', userController.getUsersPage);

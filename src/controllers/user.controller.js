@@ -195,6 +195,18 @@ const updateUserStatus = async (req, res, next) => {
   }
 };
 
+const updateCurrentProfile = async (req, res, next) => {
+  try {
+    const fields = ['nickname', 'avatar', 'sex', 'phone', 'email', 'birthday', 'introduction', 'address', 'tellPre', 'tell'];
+    const updates = {};
+    fields.forEach(f => { if (req.body[f] !== undefined) updates[f] = req.body[f]; });
+    const updated = await populateUser(User.findByIdAndUpdate(req.user._id, updates, { new: true, runValidators: true })).lean();
+    return response.success(res, toUserResult(updated), '个人信息更新成功');
+  } catch (error) {
+    next(error);
+  }
+};
+
 const updateCurrentPassword = async (req, res, next) => {
   try {
     const { password, oldPassword } = req.body;
@@ -303,6 +315,7 @@ module.exports = {
   updateUserStatus,
   resetUserPassword,
   updateCurrentPassword,
+  updateCurrentProfile,
   importUsers,
   checkExistence
 };

@@ -119,11 +119,29 @@ const createMenus = async () => {
     meta: '{"lang":{"zh_TW":"系統管理","en":"System"}}'
   });
 
+  const personalMenu = await Menu.create({
+    title: '个人中心',
+    menuType: 0,
+    path: '/user',
+    parentId: '0',
+    sortNumber: 2,
+    icon: 'ControlOutlined',
+    hide: 0,
+    openType: 0,
+    meta: '{"lang":{"zh_TW":"個人中心","en":"User"}}'
+  });
+
   const pid = systemMenu._id.toString();
   const dashboardPid = dashboardMenu._id.toString();
+  const personalPid = personalMenu._id.toString();
 
   const [workplaceMenu] = await Menu.insertMany([
     { title: '工作台', menuType: 1, path: '/dashboard/workplace', parentId: dashboardPid, sortNumber: 1, icon: 'DesktopOutlined', hide: 0, openType: 0, component: '/dashboard/workplace', meta: '{"lang":{"zh_TW":"工作臺","en":"Workplace"}}' }
+  ]);
+
+  const [profileMenu, messageMenu] = await Menu.insertMany([
+    { title: '我的资料', menuType: 1, path: '/user/profile',             parentId: personalPid, sortNumber: 1, icon: 'UserOutlined',     hide: 0, openType: 0, component: '/user/profile', meta: '{"lang":{"zh_TW":"個人資料","en":"Profile"}}' },
+    { title: '我的消息', menuType: 1, path: '/user/message',             parentId: personalPid, sortNumber: 2, icon: 'MessageOutlined',   hide: 0, openType: 0, component: '/user/message', meta: '{"lang":{"zh_TW":"我的消息","en":"Message"}}' }
   ]);
 
   const [userMenu, roleMenu, menuMenu, orgMenu, dictMenu, fileMenu, loginLogMenu, operationLogMenu] =
@@ -172,13 +190,14 @@ const createMenus = async () => {
     { title: '查看记录',   menuType: 2, openType: 0, parentId: fileMenu._id.toString(),      sortNumber: 3, authority: 'sys:file:list' },
   ]);
 
-  logger.info(`Created menus (${11 + buttons.length} total)`);
-  return { dashboardMenu, workplaceMenu, systemMenu, userMenu, roleMenu, menuMenu, orgMenu, dictMenu, fileMenu, loginLogMenu, operationLogMenu, buttons };
+  logger.info(`Created menus (${14 + buttons.length} total)`);
+  return { dashboardMenu, workplaceMenu, personalMenu, profileMenu, messageMenu, systemMenu, userMenu, roleMenu, menuMenu, orgMenu, dictMenu, fileMenu, loginLogMenu, operationLogMenu, buttons };
 };
 
 const createRoles = async (menus) => {
   const pageMenuIds = [
     menus.dashboardMenu._id, menus.workplaceMenu._id, menus.systemMenu._id,
+    menus.personalMenu._id, menus.profileMenu._id, menus.messageMenu._id,
     menus.userMenu._id, menus.roleMenu._id, menus.menuMenu._id,
     menus.orgMenu._id, menus.dictMenu._id, menus.fileMenu._id,
     menus.loginLogMenu._id, menus.operationLogMenu._id
@@ -205,6 +224,7 @@ const createUsers = async (roles, organizations) => {
       email: 'admin@example.com',
       phone: '13800138000',
       password: 'admin123',
+      avatar: 'https://ck-bkt-knowledge-payment.oss-cn-hangzhou.aliyuncs.com/admin/material/9_material_admin/image/assets/i/wap/fashou/no_login_head.png',
       status: 0,
       comments: '系统管理员账号',
       organizationId: organizations.devTeam._id,
@@ -217,6 +237,7 @@ const createUsers = async (roles, organizations) => {
       email: 'test@example.com',
       phone: '13800138001',
       password: 'test123',
+      avatar: 'https://ck-bkt-knowledge-payment.oss-cn-hangzhou.aliyuncs.com/admin/material/9_material_admin/image/assets/i/wap/fashou/no_login_head.png',
       status: 0,
       comments: '测试用户账号',
       organizationId: organizations.devTeam._id,
@@ -229,6 +250,7 @@ const createUsers = async (roles, organizations) => {
       email: 'guest@example.com',
       phone: '13800138002',
       password: 'guest123',
+      avatar: 'https://ck-bkt-knowledge-payment.oss-cn-hangzhou.aliyuncs.com/admin/material/9_material_admin/image/assets/i/wap/fashou/no_login_head.png',
       status: 0,
       comments: '访客账号',
       organizationId: organizations.devTeam._id,
