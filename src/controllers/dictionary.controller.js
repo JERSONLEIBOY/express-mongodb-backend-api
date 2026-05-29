@@ -96,7 +96,7 @@ const getDictionaries = async (req, res, next) => {
  */
 const getDictionaryDataPage = async (req, res, next) => {
   try {
-    const { dictId, page = 1, limit = 20, dictDataName, dictDataCode } = req.query;
+    const { dictId, page = 1, limit = 20, sort = 'sortNumber', order = 'asc', dictDataName, dictDataCode } = req.query;
 
     const dict = await Dictionary.findById(dictId).lean();
     if (!dict) return response.notFound(res, '字典不存在');
@@ -106,8 +106,10 @@ const getDictionaryDataPage = async (req, res, next) => {
     if (dictDataCode) query.dictDataCode = new RegExp(dictDataCode, 'i');
 
     const skip = (Number(page) - 1) * Number(limit);
+    const sortFieldMap = { createTime: 'createdAt', updateTime: 'updatedAt' };
+    const sortObj = { [sortFieldMap[sort] || sort]: order === 'asc' ? 1 : -1 };
     const [items, count] = await Promise.all([
-      DictionaryItem.find(query).sort({ sortNumber: 1 }).skip(skip).limit(Number(limit)).lean(),
+      DictionaryItem.find(query).sort(sortObj).skip(skip).limit(Number(limit)).lean(),
       DictionaryItem.countDocuments(query)
     ]);
 

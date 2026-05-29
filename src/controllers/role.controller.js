@@ -41,11 +41,13 @@ const buildQuery = ({ roleName, roleCode, comments }) => {
  */
 const getRolesPage = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, ...filters } = req.query;
+    const { page = 1, limit = 20, sort = 'createdAt', order = 'desc', ...filters } = req.query;
     const query = buildQuery(filters);
     const skip = (Number(page) - 1) * Number(limit);
+    const sortFieldMap = { createTime: 'createdAt', updateTime: 'updatedAt' };
+    const sortObj = { [sortFieldMap[sort] || sort]: order === 'asc' ? 1 : -1 };
     const [list, count] = await Promise.all([
-      Role.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+      Role.find(query).sort(sortObj).skip(skip).limit(Number(limit)).lean(),
       Role.countDocuments(query)
     ]);
     return response.success(res, { list: list.map(formatRole), count });

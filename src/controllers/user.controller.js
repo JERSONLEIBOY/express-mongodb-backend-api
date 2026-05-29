@@ -100,11 +100,14 @@ const toUserResult = (u) => {
 
 const getUsersPage = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, ...filters } = req.query;
+    const { page = 1, limit = 20, sort = 'createdAt', order = 'desc', ...filters } = req.query;
     const query = buildQuery(filters);
     const skip = (Number(page) - 1) * Number(limit);
+    const sortFieldMap = { createTime: 'createdAt', updateTime: 'updatedAt' };
+    const sortField = sortFieldMap[sort] || sort;
+    const sortObj = { [sortField]: order === 'asc' ? 1 : -1 };
     const [list, count] = await Promise.all([
-      populateUser(User.find(query)).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+      populateUser(User.find(query)).sort(sortObj).skip(skip).limit(Number(limit)).lean(),
       User.countDocuments(query)
     ]);
     return response.success(res, { list: list.map(toUserResult), count });

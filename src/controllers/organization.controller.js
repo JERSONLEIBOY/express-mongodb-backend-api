@@ -58,11 +58,13 @@ const buildQuery = ({ organizationName, organizationFullName, organizationType }
  */
 const getOrganizationsPage = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, ...filters } = req.query;
+    const { page = 1, limit = 20, sort = 'sortNumber', order = 'asc', ...filters } = req.query;
     const query = buildQuery(filters);
     const skip = (Number(page) - 1) * Number(limit);
+    const sortFieldMap = { createTime: 'createdAt', updateTime: 'updatedAt' };
+    const sortObj = { [sortFieldMap[sort] || sort]: order === 'asc' ? 1 : -1 };
     const [list, count, typeMap] = await Promise.all([
-      Organization.find(query).sort({ sortNumber: 1 }).skip(skip).limit(Number(limit)).lean(),
+      Organization.find(query).sort(sortObj).skip(skip).limit(Number(limit)).lean(),
       Organization.countDocuments(query),
       getOrgTypeMap()
     ]);

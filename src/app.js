@@ -9,9 +9,11 @@ const fs = require('fs');
 const { config, logger, mongoOptions } = require('./config');
 const routes = require('./routes');
 const { errorHandler, notFoundHandler } = require('./middlewares/error.middleware');
-const { operationLogger, requestLogger } = require('./middlewares/logger.middleware');
+const { createOperationLogger, requestLogger } = require('./middlewares/logger.middleware');
 const { traceMiddleware } = require('./middlewares/trace.middleware');
 const { swaggerUi, specs } = require('./config/swagger');
+const { buildSwaggerMetaMap } = require('./utils/swaggerMeta');
+const swaggerMetaMap = buildSwaggerMetaMap(specs);
 
 const app = express();
 
@@ -56,7 +58,7 @@ app.get('/', (req, res) => {
 // API 文档端点
 app.use('/api-docs', swaggerUi.serve, swaggerUi.setup(specs));
 
-app.use(operationLogger);
+app.use(createOperationLogger(swaggerMetaMap));
 
 routes(app);
 

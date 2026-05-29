@@ -2,6 +2,7 @@ const { logger } = require('../config');
 const UAParser = require('ua-parser-js');
 const { lookupLocation } = require('../utils/ipLocation');
 const operationLogQueue = require('../utils/operationLogQueue');
+const { lookupSwaggerMeta } = require('../utils/swaggerMeta');
 
 // 敏感字段：写入 params 前替换为 ******
 const SENSITIVE_KEYS = new Set([
@@ -93,7 +94,7 @@ const audit = (meta = {}) => (req, res, next) => {
   next();
 };
 
-const operationLogger = async (req, res, next) => {
+const createOperationLogger = (swaggerMetaMap) => async (req, res, next) => {
   // 只处理 /api 下的请求
   if (!req.path.startsWith('/api')) return next();
 
@@ -124,9 +125,10 @@ const operationLogger = async (req, res, next) => {
       const spendTime = Date.now() - startTime;
       const isError = res.statusCode >= 400;
 
-      const moduleName = meta.module || extractModuleFromUrl(req.originalUrl);
+      const swaggerMeta = swaggerMetaMap ? lookupSwaggerMeta(swaggerMetaMap, method, req.originalUrl) : null;
+      const moduleName = meta.module || (swaggerMeta && swaggerMeta.module) || extractModuleFromUrl(req.originalUrl);
       const businessType = meta.businessType || inferBusinessType(method);
-      const description = meta.description || buildDefaultDescription(req.originalUrl, method);
+      const description = meta.description || (swaggerMeta && swaggerMeta.description) || buildDefaultDescription(req.originalUrl, method);
 
       // 参数脱敏
       const rawParams = method !== 'GET' ? req.body : req.query;
@@ -146,7 +148,7 @@ const operationLogger = async (req, res, next) => {
         }
       }
 
-      const ip = req.ip || req.connection.remoteAddress;
+      const ip = (req.ip || req.connection.remoteAddress || '').replace(/^::ffff:/, '') || '::1';
 
       operationLogQueue.push({
         userId: req.user ? req.user._id : null,
@@ -181,11 +183,11 @@ const requestLogger = (req, res, next) => {
   res.on('finish', () => {
     logger.info(`${req.method} ${req.originalUrl} ${res.statusCode} - ${Date.now() - startTime}ms`, {
       traceId: req.traceId,
-      ip: req.ip,
+      ip: (req.ip || '').replace(/^::ffff:/, '') || '::1',
       userAgent: req.get('user-agent')
     });
   });
   next();
 };
 
-module.exports = { operationLogger, requestLogger, parseUA, audit };
+module.exports = { createOperationLogger, requestLogger, parseUA, audit };

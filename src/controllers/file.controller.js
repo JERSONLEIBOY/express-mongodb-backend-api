@@ -33,7 +33,7 @@ const formatFile = (file, baseUrl) => ({
 
 const getFiles = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, name, path: filePath, createNickname } = req.query;
+    const { page = 1, limit = 20, sort = 'createdAt', order = 'desc', name, path: filePath, createNickname } = req.query;
 
     const query = {};
     if (name) query.name = new RegExp(name, 'i');
@@ -42,16 +42,16 @@ const getFiles = async (req, res, next) => {
     const pageNum = parseInt(page, 10);
     const limitNum = Math.min(parseInt(limit, 10) || 20, 100);
     const skip = (pageNum - 1) * limitNum;
-
-    let dbQuery = File.find(query).populate('createUserId', 'username nickname').sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean();
+    const sortFieldMap = { createTime: 'createdAt', updateTime: 'updatedAt' };
+    const sortObj = { [sortFieldMap[sort] || sort]: order === 'asc' ? 1 : -1 };
 
     if (createNickname) {
-      // 需要先查用户再过滤，简单处理：先查全部再过滤
       const User = require('../models/User');
       const users = await User.find({ nickname: new RegExp(createNickname, 'i') }, '_id').lean();
       query.createUserId = { $in: users.map(u => u._id) };
-      dbQuery = File.find(query).populate('createUserId', 'username nickname').sort({ createdAt: -1 }).skip(skip).limit(limitNum).lean();
     }
+
+    let dbQuery = File.find(query).populate('createUserId', 'username nickname').sort(sortObj).skip(skip).limit(limitNum).lean();
 
     const [list, count] = await Promise.all([dbQuery, File.countDocuments(query)]);
     const baseUrl = getBaseUrl(req);

@@ -62,7 +62,8 @@
       "Bash(set TOKEN=eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJ1c2VySWQiOiI2YTA2YmZkY2VmMDZkYWMyYWViYzg5ZGUiLCJ1c2VybmFtZSI6ImFkbWluIiwiaWF0IjoxNzc5MjUyNDgzLCJleHAiOjE3Nzk4NTcyODN9.0778e_H4rvA9v07S5SDAUPlViGkOkN8wqVUYyhmkApE)",
       "Bash(findstr /I \"X-Request-Id status HTTP\")",
       "Bash(findstr /I \"X-Request-Id HTTP\")",
-      "mcp__chrome-devtools__list_console_messages"
+      "mcp__chrome-devtools__list_console_messages",
+      "Read(//c/Users/Administrator/.claude/plugins/**)"
     ]
   }
 }

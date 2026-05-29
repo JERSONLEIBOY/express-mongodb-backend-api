@@ -139,11 +139,13 @@ const buildOperationLogQuery = async ({ username, module, status, createTimeStar
  */
 const getLoginLogsPage = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, ...filters } = req.query;
+    const { page = 1, limit = 20, sort = 'createdAt', order = 'desc', ...filters } = req.query;
     const query = buildLoginLogQuery(filters);
     const skip = (Number(page) - 1) * Number(limit);
+    const sortFieldMap = { createTime: 'createdAt', updateTime: 'updatedAt' };
+    const sortObj = { [sortFieldMap[sort] || sort]: order === 'asc' ? 1 : -1 };
     const [list, count] = await Promise.all([
-      LoginLog.find(query).sort({ createdAt: -1 }).skip(skip).limit(Number(limit)).lean(),
+      LoginLog.find(query).sort(sortObj).skip(skip).limit(Number(limit)).lean(),
       LoginLog.countDocuments(query)
     ]);
 
@@ -343,13 +345,15 @@ const clearLoginLogs = async (req, res, next) => {
  */
 const getOperationLogsPage = async (req, res, next) => {
   try {
-    const { page = 1, limit = 20, ...filters } = req.query;
+    const { page = 1, limit = 20, sort = 'createdAt', order = 'desc', ...filters } = req.query;
     const query = await buildOperationLogQuery(filters);
     const skip = (Number(page) - 1) * Number(limit);
+    const sortFieldMap = { createTime: 'createdAt', updateTime: 'updatedAt' };
+    const sortObj = { [sortFieldMap[sort] || sort]: order === 'asc' ? 1 : -1 };
     const [list, count] = await Promise.all([
       OperationLog.find(query)
         .populate('userId', 'username nickname')
-        .sort({ createdAt: -1 })
+        .sort(sortObj)
         .skip(skip)
         .limit(Number(limit))
         .lean(),

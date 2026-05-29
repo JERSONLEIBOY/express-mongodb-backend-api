@@ -14,7 +14,7 @@ const { lookupLocation } = require('../utils/ipLocation');
 
 const buildLoginLog = (req, { username, nickname, loginType, comments }) => {
   const ua = parseUA(req.get('user-agent') || '');
-  const ip = req.ip;
+  const ip = (req.ip || '').replace(/^::ffff:/, '') || '::1';
   return {
     username: username || 'unknown',
     nickname: nickname || '',
