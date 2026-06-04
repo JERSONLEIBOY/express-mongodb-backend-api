@@ -63,7 +63,10 @@
       "Bash(findstr /I \"X-Request-Id status HTTP\")",
       "Bash(findstr /I \"X-Request-Id HTTP\")",
       "mcp__chrome-devtools__list_console_messages",
-      "Read(//c/Users/Administrator/.claude/plugins/**)"
+      "Read(//c/Users/Administrator/.claude/plugins/**)",
+      "Read(//c/c/Users/Administrator/Desktop/my_project/express_mongoodb/backup/**)",
+      "Bash(tar -tzvf ele_admin_backup_20260604.tar.gz)",
+      "Bash(gzip -t ele_admin_backup_20260604.tar.gz)"
     ]
   }
 }
