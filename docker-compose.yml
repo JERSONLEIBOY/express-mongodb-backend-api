@@ -15,6 +15,7 @@ services:
       - ele_admin_network
 
   app:
+    env_file: .env.production
     build:
       context: .
       dockerfile: docker/Dockerfile

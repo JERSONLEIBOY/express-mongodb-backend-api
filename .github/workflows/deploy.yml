@@ -24,5 +24,12 @@ jobs:
             cd /opt/express-mongodb-backend-api
             sudo git fetch origin
             sudo git reset --hard origin/main
+
+            # 从 template 生成生产配置
+            sudo cp .env.production.template .env.production
+            sudo sed -i "s|<SERVER_URL>|${{ secrets.SERVER_URL }}|g" .env.production
+            sudo sed -i "s|<JWT_SECRET>|${{ secrets.JWT_SECRET }}|g" .env.production
+            sudo sed -i "s|<CORS_ORIGIN>|${{ secrets.CORS_ORIGIN }}|g" .env.production
+
             sudo docker compose up -d --build
             sudo docker image prune -f

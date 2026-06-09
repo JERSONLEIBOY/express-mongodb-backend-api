@@ -91,7 +91,9 @@
       "Bash(git commit -q -m 'chore: 移除未使用依赖 express-validator *)",
       "Bash(git commit -q -m 'chore: 仅保留最新数据库备份 *)",
       "Bash(git push *)",
-      "Bash(git commit -q -m 'chore: 删除 Playwright 测试快照残留 *)"
+      "Bash(git commit -q -m 'chore: 删除 Playwright 测试快照残留 *)",
+      "Bash(tar -tzf backup/ele_admin_backup_20260609_100724.tar.gz)",
+      "Bash(git commit -q -m 'feat: 实现多环境配置自动化部署 *)"
     ]
   }
 }
