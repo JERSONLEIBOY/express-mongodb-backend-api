@@ -30,6 +30,8 @@ jobs:
             sudo sed -i "s|<SERVER_URL>|${{ secrets.SERVER_URL }}|g" .env.production
             sudo sed -i "s|<JWT_SECRET>|${{ secrets.JWT_SECRET }}|g" .env.production
             sudo sed -i "s|<CORS_ORIGIN>|${{ secrets.CORS_ORIGIN }}|g" .env.production
+            sudo sed -i "s|<MONGO_ROOT_USERNAME>|${{ secrets.MONGO_ROOT_USERNAME }}|g" .env.production
+            sudo sed -i "s|<MONGO_ROOT_PASSWORD>|${{ secrets.MONGO_ROOT_PASSWORD }}|g" .env.production
 
             sudo docker compose up -d --build
             sudo docker image prune -f
