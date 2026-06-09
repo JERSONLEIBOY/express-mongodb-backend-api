@@ -66,7 +66,18 @@
       "Read(//c/Users/Administrator/.claude/plugins/**)",
       "Read(//c/c/Users/Administrator/Desktop/my_project/express_mongoodb/backup/**)",
       "Bash(tar -tzvf ele_admin_backup_20260604.tar.gz)",
-      "Bash(gzip -t ele_admin_backup_20260604.tar.gz)"
+      "Bash(gzip -t ele_admin_backup_20260604.tar.gz)",
+      "Bash(tar -tzf backup/ele_admin_backup_20260604.tar.gz)",
+      "Bash(mongodump --version)",
+      "Bash(winget --version)",
+      "Bash(choco --version)",
+      "Bash(winget install *)",
+      "Read(//c/Program Files/MongoDB/Tools/**)",
+      "Bash(\"/c/Program Files/MongoDB/Tools/100/bin/mongodump.exe\" --version)",
+      "Bash(\"/c/Program Files/MongoDB/Tools/100/bin/mongodump.exe\" --host 8.148.145.218 --port 27017 --db ele_admin --out /tmp/verify_test)",
+      "Bash(echo \"=== mongodump 退出码: $? ===\")",
+      "Bash(rm -rf /tmp/verify_test)",
+      "Bash(base64 -w0 scripts/backup-mongo.sh)"
     ]
   }
 }
