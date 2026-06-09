@@ -77,7 +77,17 @@
       "Bash(\"/c/Program Files/MongoDB/Tools/100/bin/mongodump.exe\" --host 8.148.145.218 --port 27017 --db ele_admin --out /tmp/verify_test)",
       "Bash(echo \"=== mongodump 退出码: $? ===\")",
       "Bash(rm -rf /tmp/verify_test)",
-      "Bash(base64 -w0 scripts/backup-mongo.sh)"
+      "Bash(base64 -w0 scripts/backup-mongo.sh)",
+      "Bash(git check-ignore *)",
+      "Bash(grep -E \"\\\\.env$|cookies\")",
+      "Bash(rm check-users.js manage-users.js test-bcrypt.js fix-db.js src/config/swagger-simple.js scripts/demo-openapi.js)",
+      "Bash(rmdir scripts *)",
+      "Bash(rm src/utils/password.js)",
+      "Bash(rmdir docs *)",
+      "Bash(git rm *)",
+      "Bash(ls cookies.txt)",
+      "Bash(git add *)",
+      "Bash(git commit -q -m 'chore: 清理调试脚本与无引用死代码 *)"
     ]
   }
 }

@@ -17,3 +17,7 @@ coverage/
 *.swo
 *~
 .cache/
+
+# 调试 / 测试残留
+cookies.txt
+.playwright-mcp/
