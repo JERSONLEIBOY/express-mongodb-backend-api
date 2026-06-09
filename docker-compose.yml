@@ -5,6 +5,7 @@ services:
     image: mongo:6
     container_name: ele_admin_mongodb
     restart: unless-stopped
+    env_file: .env.production
     environment:
       MONGO_INITDB_DATABASE: ele_admin
       MONGO_INITDB_ROOT_USERNAME: ${MONGO_ROOT_USERNAME}
