@@ -238,6 +238,18 @@ const createMenu = async (req, res, next) => {
   try {
     const { title, menuType, path, parentId, sortNumber, icon, hide, component, redirect, authority, meta, openType, checked } = req.body;
 
+    // 检查同一父级下是否已存在相同的排序值
+    if (sortNumber !== undefined && sortNumber !== null) {
+      const existingMenu = await Menu.findOne({
+        parentId: parentId ?? '0',
+        sortNumber
+      });
+
+      if (existingMenu) {
+        return response.badRequest(res, `排序值 ${sortNumber} 在当前层级已被使用，请选择其他排序值`);
+      }
+    }
+
     const menu = await Menu.create({ title, menuType, path, parentId, sortNumber, icon, hide, component, redirect, authority, meta, openType, checked });
 
     return response.created(res, formatMenu(menu.toObject()), '菜单创建成功');
@@ -347,6 +359,22 @@ const updateMenu = async (req, res, next) => {
 
     const menu = await Menu.findById(id);
     if (!menu) return response.notFound(res, '菜单不存在');
+
+    // 检查同一父级下是否已存在相同的排序值（排除自己）
+    const targetParentId = parentId !== undefined ? parentId : menu.parentId;
+    const targetSortNumber = sortNumber !== undefined ? sortNumber : menu.sortNumber;
+
+    if (sortNumber !== undefined || parentId !== undefined) {
+      const existingMenu = await Menu.findOne({
+        _id: { $ne: id },
+        parentId: targetParentId,
+        sortNumber: targetSortNumber
+      });
+
+      if (existingMenu) {
+        return response.badRequest(res, `排序值 ${targetSortNumber} 在当前层级已被使用，请选择其他排序值`);
+      }
+    }
 
     const updates = {};
     if (title !== undefined) updates.title = title;
