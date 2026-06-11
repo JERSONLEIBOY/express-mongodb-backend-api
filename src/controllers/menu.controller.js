@@ -1,4 +1,5 @@
 const Menu = require('../models/Menu');
+const Role = require('../models/Role');
 const response = require('../utils/response');
 
 /**
@@ -252,6 +253,12 @@ const createMenu = async (req, res, next) => {
 
     const menu = await Menu.create({ title, menuType, path, parentId, sortNumber, icon, hide, component, redirect, authority, meta, openType, checked });
 
+    // 自动将新菜单分配给所有超级管理员角色
+    await Role.updateMany(
+      { roleCode: 'ADMIN' },
+      { $addToSet: { menus: menu._id } }
+    );
+
     return response.created(res, formatMenu(menu.toObject()), '菜单创建成功');
   } catch (error) {
     next(error);
@@ -459,6 +466,12 @@ const deleteMenu = async (req, res, next) => {
     }
 
     await Menu.findByIdAndDelete(id);
+
+    // 自动从所有角色的权限列表中移除该菜单
+    await Role.updateMany(
+      {},
+      { $pull: { menus: id } }
+    );
 
     return response.success(res, null, '菜单删除成功');
   } catch (error) {
