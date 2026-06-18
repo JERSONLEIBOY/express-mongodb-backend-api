@@ -27,19 +27,14 @@ fi
 
 echo "[1/5] Docker 环境检查通过"
 
-# 3. 登录 GHCR（用于拉取私有镜像）
+# 3. 登录 GHCR（公共仓库可跳过，私有仓库需要）
 echo "[2/5] 配置 GHCR 镜像仓库登录..."
-if [ -z "$GHCR_TOKEN" ]; then
-    read -s -p "请输入 GitHub Personal Access Token (需要 read:packages 权限): " GHCR_TOKEN
-    echo
+if [ -n "$GHCR_TOKEN" ] && [ -n "$GHCR_USER" ]; then
+    echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
+    echo "[2/5] GHCR 登录成功"
+else
+    echo "[2/5] GHCR 登录已跳过（公共仓库无需登录）"
 fi
-
-if [ -z "$GHCR_USER" ]; then
-    read -p "请输入 GitHub 用户名: " GHCR_USER
-fi
-
-echo "$GHCR_TOKEN" | docker login ghcr.io -u "$GHCR_USER" --password-stdin
-echo "[2/5] GHCR 登录成功"
 
 # 4. 创建部署目录
 echo "[3/5] 创建部署目录..."
