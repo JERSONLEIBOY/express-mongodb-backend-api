@@ -9,7 +9,7 @@ set -euo pipefail
 
 DEPLOY_USER="${SUDO_USER:-$USER}"
 DEPLOY_DIR="/home/${DEPLOY_USER}/ele_admin"
-GITHUB_REPO="${1:-jersenleiboy/express-mongodb-backend-api}"
+GITHUB_REPO="${1:-JERSONLEIBOY/express-mongodb-backend-api}"
 
 echo "============================================"
 echo "  騰訊雲伺服器初始化腳本"
@@ -88,7 +88,15 @@ if [ -d ".git" ]; then
   git pull origin main
 else
   echo "📥 克隆代碼..."
-  git clone --depth 1 "https://github.com/${GITHUB_REPO}.git" /tmp/ele_admin_repo
+  # 先嘗試 SSH 方式，失敗則用 HTTPS（公開倉庫不需憑證）
+  GIT_SSH_URL="git@github.com:${GITHUB_REPO}.git"
+  GIT_HTTPS_URL="https://github.com/${GITHUB_REPO}.git"
+  if git clone --depth 1 "$GIT_SSH_URL" /tmp/ele_admin_repo 2>/dev/null; then
+    echo "   （使用 SSH 協議）"
+  else
+    echo "   （使用 HTTPS 協議）"
+    GIT_TERMINAL_PROMPT=0 git clone --depth 1 "$GIT_HTTPS_URL" /tmp/ele_admin_repo
+  fi
   cp /tmp/ele_admin_repo/docker-compose.yml "$DEPLOY_DIR/"
   cp -r /tmp/ele_admin_repo/backup "$DEPLOY_DIR/" 2>/dev/null || true
   rm -rf /tmp/ele_admin_repo
