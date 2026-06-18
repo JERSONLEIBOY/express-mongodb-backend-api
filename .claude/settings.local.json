@@ -115,7 +115,8 @@
       "WebFetch(domain:www.v2ex.com)",
       "WebFetch(domain:www.zhihu.com)",
       "WebFetch(domain:cloudharmony.com)",
-      "Bash(git *)"
+      "Bash(git *)",
+      "Bash(/Users/jersenleiboy/Desktop/project/express-mongodb-backend-api/scripts/github-secrets-helper.sh)"
     ]
   }
 }
