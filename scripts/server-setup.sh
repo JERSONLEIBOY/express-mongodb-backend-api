@@ -38,9 +38,10 @@ fi
 
 # 4. 创建部署目录
 echo "[3/5] 创建部署目录..."
-mkdir -p "${APP_DIR}"
-mkdir -p "${APP_DIR}/backup"
-mkdir -p "${APP_DIR}/logs"
+sudo mkdir -p "${APP_DIR}"
+sudo mkdir -p "${APP_DIR}/backup"
+sudo mkdir -p "${APP_DIR}/logs"
+sudo chown -R "$(whoami):$(whoami)" "${APP_DIR}"
 cd "${APP_DIR}"
 
 # 5. 下载 docker-compose.yml
