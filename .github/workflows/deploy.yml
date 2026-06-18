@@ -4,9 +4,13 @@ on:
   push:
     branches: [ main ]
 
+permissions:
+  contents: read
+  packages: write
+
 jobs:
   build-and-deploy:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-22.04
 
     steps:
       - name: Checkout code
@@ -50,7 +54,9 @@ jobs:
           port: ${{ secrets.SERVER_PORT || 22 }}
           username: ${{ secrets.SERVER_USER }}
           password: ${{ secrets.SERVER_PASSWORD }}
+          timeout: 300000
           script: |
+            set -e
             DEPLOY_DIR="/home/${{ secrets.SERVER_USER }}/ele_admin"
             mkdir -p "$DEPLOY_DIR"
             cd "$DEPLOY_DIR"
