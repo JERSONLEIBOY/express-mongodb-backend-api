@@ -43,7 +43,7 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Deploy to server
+      - name: Init & Deploy to server
         uses: appleboy/ssh-action@v1.0.3
         with:
           host: ${{ secrets.SERVER_HOST }}
@@ -51,13 +51,57 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           script: |
-            cd /home/ubuntu/ele_admin
+            DEPLOY_DIR="/home/ubuntu/ele_admin"
 
-            # 更新代码
-            git pull origin main
+            # 克隆或更新代码
+            if [ -d "$DEPLOY_DIR/.git" ]; then
+              cd "$DEPLOY_DIR"
+              git pull origin main
+            else
+              git clone https://github.com/${{ github.repository }}.git "$DEPLOY_DIR"
+              cd "$DEPLOY_DIR"
+            fi
 
-            # 拉取最新镜像并重启
+            # 首次部署：安装 Docker & Docker Compose
+            if ! command -v docker &> /dev/null; then
+              curl -fsSL https://get.docker.com | sudo sh
+              sudo usermod -aG docker $USER
+            fi
+            if ! docker compose version &> /dev/null; then
+              sudo apt-get update && sudo apt-get install -y docker-compose-plugin
+            fi
+
+            # 首次部署：配置环境
+            cp deploy/docker-compose.prod.yml docker-compose.yml
+            if [ ! -f ".env" ]; then
+              JWT_SECRET=$(openssl rand -hex 32)
+              cat > .env << EOF
+              JWT_SECRET=${JWT_SECRET}
+              JWT_EXPIRES_IN=7d
+              CORS_ORIGIN=*
+              LOG_RETENTION_DAYS=30
+              RESPONSE_TIME_ZONE=Asia/Shanghai
+              UPLOAD_MAX_SIZE=10485760
+              EOF
+            fi
+
+            # 启动 MongoDB
             docker compose pull
+            docker compose up -d mongodb
+
+            # 等待 MongoDB 就绪
+            until docker compose exec -T mongodb mongosh --eval "db.adminCommand('ping')" &>/dev/null; do
+              sleep 2
+            done
+
+            # 还原数据库备份（仅首次，检测到备份目录时执行）
+            if [ -d "backup/extract/mongo-backup/ele_admin" ]; then
+              docker cp backup/extract/mongo-backup ele_admin_mongodb:/tmp/backup
+              docker compose exec -T mongodb mongorestore --db=ele_admin /tmp/backup/ele_admin --drop
+              docker compose exec -T mongodb rm -rf /tmp/backup
+            fi
+
+            # 启动应用
             docker compose up -d --remove-orphans
             docker image prune -f
 
