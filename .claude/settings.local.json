@@ -94,7 +94,28 @@
       "Bash(git commit -q -m 'chore: 删除 Playwright 测试快照残留 *)",
       "Bash(tar -tzf backup/ele_admin_backup_20260609_100724.tar.gz)",
       "Bash(git commit -q -m 'feat: 实现多环境配置自动化部署 *)",
-      "Bash(git commit -q -m 'security: MongoDB 安全加固 *)"
+      "Bash(git commit -q -m 'security: MongoDB 安全加固 *)",
+      "Bash(pnpm -v)",
+      "Bash(mongosh --version)",
+      "Bash(brew list *)",
+      "Bash(docker --version)",
+      "Bash(lsof -nP -iTCP:27017 -sTCP:LISTEN)",
+      "Bash(pnpm run *)",
+      "WebFetch(domain:github.com)",
+      "Skill(deep-research)",
+      "Workflow(deep-research)",
+      "WebSearch",
+      "WebFetch(domain:cloud.tencent.com)",
+      "WebFetch(domain:www.aliyun.com)",
+      "WebFetch(domain:zhuanlan.zhihu.com)",
+      "WebFetch(domain:buy.cloud.tencent.com)",
+      "WebFetch(domain:www.alibabacloud.com)",
+      "mcp__plugin_context7_context7__resolve-library-id",
+      "WebFetch(domain:juejin.cn)",
+      "WebFetch(domain:www.v2ex.com)",
+      "WebFetch(domain:www.zhihu.com)",
+      "WebFetch(domain:cloudharmony.com)",
+      "Bash(git *)"
     ]
   }
 }
