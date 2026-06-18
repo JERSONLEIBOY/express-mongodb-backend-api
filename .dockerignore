@@ -1,0 +1,50 @@
+# Dependencies
+node_modules
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Git
+.git
+.gitignore
+
+# Backup
+backup/
+
+# Documentation
+*.md
+DEPLOYMENT.md
+OPENAPI-USAGE.md
+CLAUDE.md
+
+# Deployment configs (not needed inside container)
+docker-compose.yml
+docker/
+.github/
+
+# Uploads
+src/uploads/*
+!src/uploads/.gitkeep
+uploads/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+
+# Scripts (not needed inside container)
+scripts/
+
+# Trae
+.trae/
