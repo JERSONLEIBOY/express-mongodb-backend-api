@@ -5,7 +5,7 @@
 # 用法: bash deploy/init-server.sh
 # ============================================
 
-set -e
+set -euo pipefail
 
 DEPLOY_USER="${SUDO_USER:-$USER}"
 DEPLOY_DIR="/home/${DEPLOY_USER}/ele_admin"
@@ -96,6 +96,13 @@ fi
 
 # 7. 創建 .env（首次）
 echo "🔑 [7/7] 創建 .env 文件..."
+
+# Ensure openssl is available
+if ! command -v openssl &>/dev/null; then
+  echo "📦 安裝 openssl..."
+  sudo apt-get install -y openssl
+fi
+
 if [ ! -f ".env" ]; then
   JWT_SECRET=$(openssl rand -hex 32)
   cat > .env << EOF
