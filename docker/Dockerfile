@@ -3,10 +3,8 @@ FROM node:18-alpine AS deps
 
 WORKDIR /app
 
-# 只复制依赖文件，利用 Docker 缓存
 COPY package*.json ./
 
-# 安装生产依赖
 RUN npm ci --only=production && \
     npm cache clean --force
 
@@ -15,11 +13,8 @@ FROM node:18-alpine
 
 WORKDIR /app
 
-# 安装 tini 和 curl（用于健康检查）
-RUN apk add --no-cache tini curl
-
-# 全局安装 PM2
-RUN npm install -g pm2
+# 安装 curl（用于健康检查）
+RUN apk add --no-cache curl
 
 # 从依赖阶段复制 node_modules
 COPY --from=deps /app/node_modules ./node_modules
@@ -28,7 +23,7 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # 创建必要目录并设置权限
-RUN mkdir -p logs uploads && \
+RUN mkdir -p uploads logs && \
     chown -R node:node /app
 
 # 切换到非 root 用户
@@ -40,10 +35,6 @@ EXPOSE 3000
 # 设置生产环境
 ENV NODE_ENV=production
 
-# 健康检查
-HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-  CMD curl -f http://localhost:3000/health || exit 1
-
-# 使用 tini 作为初始化进程
+# 使用 tini 作为初始化进程，docker stop 时优雅关闭
 ENTRYPOINT ["/sbin/tini", "--"]
-CMD ["pm2-runtime", "start", "pm2.config.js"]
+CMD ["node", "src/app.js"]

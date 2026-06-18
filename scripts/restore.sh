@@ -3,16 +3,15 @@ set -e
 
 # ============================================================
 # MongoDB 数据库恢复脚本
-# 用法: ./scripts/restore-db.sh <备份文件路径>
-# 例如: ./scripts/restore-db.sh /opt/ele_admin/backup/ele_admin_backup_20260618_120000.tar.gz
+# 用法: ./scripts/restore.sh <备份文件路径>
+# 示例: ./scripts/restore.sh /opt/ele_admin/backup/ele_admin_20260618_120000.tar.gz
 # ============================================================
 
 if [ -z "$1" ]; then
     echo "用法: $0 <备份文件路径>"
-    echo "例如: $0 /opt/ele_admin/backup/ele_admin_backup_20260618_120000.tar.gz"
     echo ""
-    echo "当前可用备份:"
-    ls -lh /opt/ele_admin/backup/*.tar.gz 2>/dev/null | awk '{print $9, $5}'
+    echo "可用备份:"
+    ls -lh /opt/ele_admin/backup/*.tar.gz 2>/dev/null | awk '{print $9, $5}' || echo "  无备份文件"
     exit 1
 fi
 
@@ -43,7 +42,7 @@ fi
 # 复制到容器
 docker cp "${TEMP_DIR}/dump" "${CONTAINER_NAME}:/tmp/restore_dump"
 
-# 执行恢复（会覆盖现有数据）
+# 执行恢复（--drop 会覆盖现有数据）
 echo "正在恢复数据库..."
 docker exec "${CONTAINER_NAME}" mongorestore \
     --db="${DB_NAME}" \

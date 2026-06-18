@@ -20,7 +20,7 @@ services:
       start_period: 30s
 
   app:
-    image: ghcr.io/${GITHUB_REPOSITORY:-username/express-mongodb-backend-api}:latest
+    image: ghcr.io/${GITHUB_REPOSITORY:-jersonleiboy/express-mongodb-backend-api}:${IMAGE_TAG:-latest}
     container_name: ele_admin_backend
     restart: unless-stopped
     environment:
@@ -44,7 +44,7 @@ services:
     networks:
       - ele_admin_network
     healthcheck:
-      test: ["CMD", "curl", "-f", "http://localhost:3000/health"]
+      test: ["CMD", "curl", "-sf", "http://localhost:3000/health"]
       interval: 30s
       timeout: 10s
       retries: 3
