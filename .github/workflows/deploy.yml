@@ -21,6 +21,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
       - name: Extract metadata
         id: meta
         uses: docker/metadata-action@v5
@@ -48,37 +51,6 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
-      - name: Extract image SHA
-        id: image
-        shell: bash
-        run: |
-          echo "sha=$(echo '${{ steps.meta.outputs.tags }}' | grep -oP 'sha-\K[0-9a-f]{7}')" >> $GITHUB_OUTPUT
-          echo "full=$(echo '${{ steps.meta.outputs.tags }}' | grep -oP 'sha-[0-9a-f]{40}')" >> $GITHUB_OUTPUT
-
-      - name: Upload deployment info
-        uses: actions/upload-artifact@v4
-        with:
-          name: deployment-info
-          path: |
-            deployment_info.txt
-          retention-days: 1
-
-      - name: Save deployment info
-        shell: bash
-        run: |
-          cat > deployment_info.txt << EOF
-          IMAGE_TAG=sha-${{ env.GITHUB_SHA }}
-          IMAGE_FULL=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ env.GITHUB_SHA }}
-          PREVIOUS_SHA=$(git rev-parse HEAD^1 2>/dev/null || echo "")
-          EOF
-
-      - name: Set outputs
-        id: deploy-info
-        shell: bash
-        run: |
-          echo "image_sha=sha-${{ env.GITHUB_SHA }}" >> $GITHUB_OUTPUT
-          echo "image_full=${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:sha-${{ env.GITHUB_SHA }}" >> $GITHUB_OUTPUT
-
       - name: Deploy to server
         uses: appleboy/ssh-action@v1
         with:
@@ -93,37 +65,34 @@ jobs:
 
             cd $APP_DIR
 
+            IMAGE_TAG="sha-${{ github.sha }}"
+            IMAGE_FULL="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+
             echo "=========================================="
             echo "  开始部署"
             echo "=========================================="
             echo "镜像: $IMAGE_FULL"
 
-            # 记录当前版本（用于回滚）
             if [ -f .versions ]; then
               CURRENT=$(head -n1 .versions | awk '{print $1}')
               echo "当前版本: $CURRENT"
             fi
 
-            # 停止旧服务
             echo ""
             echo "停止旧服务..."
             docker compose down || true
 
-            # 拉取新镜像
             echo ""
             echo "拉取新镜像..."
             docker compose pull
 
-            # 更新版本记录
             echo ""
             echo "$IMAGE_TAG $(date +%Y-%m-%d_%H:%M:%S)" > .versions
 
-            # 启动服务
             echo ""
             echo "启动服务..."
             IMAGE_TAG=$IMAGE_TAG docker compose up -d
 
-            # 健康检查
             echo ""
             echo "健康检查..."
             for i in $(seq 1 12); do
