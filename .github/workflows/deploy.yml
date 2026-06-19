@@ -1,0 +1,185 @@
+name: Deploy to Server
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  IMAGE_NAME: ghcr.io/jersonleiboy/express-mongodb-backend-api
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata
+        id: meta
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.IMAGE_NAME }}
+          tags: |
+            type=sha,prefix=sha-
+            type=raw,value=latest
+
+      - name: Build and push Docker image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          dockerfile: docker/Dockerfile
+          push: true
+          tags: ${{ steps.meta.outputs.tags }}
+          labels: ${{ steps.meta.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Deploy to server
+        uses: appleboy/ssh-action@v1
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          script: |
+            set -e
+
+            APP_DIR="/opt/ele_admin"
+            IMAGE_TAG="sha-${{ github.sha }}"
+            IMAGE_FULL="${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+
+            echo "===== 开始部署 ====="
+            echo "镜像: ${IMAGE_FULL}"
+
+            # 创建应用目录
+            sudo mkdir -p $APP_DIR
+            sudo chown -R ubuntu:ubuntu $APP_DIR
+
+            cd $APP_DIR
+
+            # 复制 docker-compose.yml
+            cp /dev/null docker-compose.yml 2>/dev/null || true
+            cat > docker-compose.yml << 'COMPOSE_EOF'
+            version: '3.8'
+
+            services:
+              mongodb:
+                image: mongo:7
+                container_name: ele_admin_mongodb
+                restart: unless-stopped
+                ports:
+                  - "27017:27017"
+                volumes:
+                  - mongodb_data:/data/db
+                environment:
+                  MONGO_INITDB_DATABASE: ele_admin
+                healthcheck:
+                  test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 5
+                  start_period: 30s
+
+              app:
+                image: ghcr.io/jersonleiboy/express-mongodb-backend-api:${IMAGE_TAG}
+                container_name: ele_admin_backend
+                restart: unless-stopped
+                ports:
+                  - "3000:3000"
+                depends_on:
+                  mongodb:
+                    condition: service_healthy
+                environment:
+                  NODE_ENV: production
+                  PORT: 3000
+                  MONGODB_URI: mongodb://mongodb:27017/ele_admin
+                  JWT_SECRET: ${{ secrets.JWT_SECRET }}
+                  JWT_EXPIRES_IN: 7d
+                  CORS_ORIGIN: ${{ secrets.CORS_ORIGIN || '*' }}
+                  LOG_RETENTION_DAYS: 30
+                  RESPONSE_TIME_ZONE: Asia/Shanghai
+                  UPLOAD_PATH: ./src/uploads
+                  UPLOAD_MAX_SIZE: 10485760
+                volumes:
+                  - app_uploads:/app/src/uploads
+                healthcheck:
+                  test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
+                  interval: 30s
+                  timeout: 10s
+                  retries: 3
+                  start_period: 40s
+
+            volumes:
+              mongodb_data:
+              app_uploads:
+            COMPOSE_EOF
+
+            echo "docker-compose.yml 已更新"
+
+            # 拉取最新镜像
+            echo "正在拉取镜像..."
+            for i in $(seq 1 10); do
+              if docker pull ${IMAGE_FULL}; then
+                echo "镜像拉取成功"
+                break
+              fi
+              echo "镜像拉取失败，等待重试... (${i}/10)"
+              sleep 15
+              if [ $i -eq 10 ]; then
+                echo "镜像拉取失败，已重试 10 次"
+                exit 1
+              fi
+            done
+
+            # 停止并删除旧容器
+            echo "停止旧容器..."
+            docker-compose down --remove-orphans 2>/dev/null || true
+
+            # 启动服务
+            echo "启动服务..."
+            IMAGE_TAG="sha-${{ github.sha }}" docker-compose up -d
+
+            # 等待服务健康
+            echo "等待服务启动..."
+            sleep 10
+
+            # 检查容器状态
+            echo "检查容器状态..."
+            docker-compose ps
+
+            # 检查应用健康
+            for i in $(seq 1 30); do
+              if curl -sf http://localhost:3000/health > /dev/null; then
+                echo "应用健康检查通过"
+                break
+              fi
+              echo "等待应用启动... (${i}/30)"
+              sleep 2
+            done
+
+            echo "===== 部署完成 ====="
