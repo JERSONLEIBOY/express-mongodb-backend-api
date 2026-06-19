@@ -84,7 +84,18 @@ jobs:
 
             echo ""
             echo "拉取新镜像..."
-            docker pull ${IMAGE_FULL}
+            for i in $(seq 1 10); do
+              if docker pull ${IMAGE_FULL}; then
+                echo "镜像拉取成功"
+                break
+              fi
+              echo "镜像拉取失败，等待重试... (${i}/10)"
+              sleep 15
+              if [ $i -eq 10 ]; then
+                echo "❌ 镜像拉取失败，已重试 10 次"
+                exit 1
+              fi
+            done
 
             echo ""
             echo "$IMAGE_TAG $(date +%Y-%m-%d_%H:%M:%S)" > .versions
@@ -121,8 +132,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          envs:
-            APP_DIR
+          envs: APP_DIR
           script: |
             cd $APP_DIR
             echo "检测到部署失败，执行回滚..."
