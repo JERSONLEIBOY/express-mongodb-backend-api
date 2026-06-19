@@ -8,10 +8,10 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
-    env:
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      CORS_ORIGIN: ${{ secrets.CORS_ORIGIN || '*' }}
     steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1
         with:
@@ -22,15 +22,16 @@ jobs:
           envs: JWT_SECRET,CORS_ORIGIN
           script: |
             set -e
-            
+
             APP_DIR="/opt/ele_admin"
             REPO_DIR="$APP_DIR/repo"
-            
+            IMAGE_TAG="latest"
+
             echo "===== 开始部署 ====="
-            
+
             sudo mkdir -p $APP_DIR
-            sudo chown -R ubuntu:ubuntu $APP_DIR
-            
+            sudo chown -R $USER:$USER $APP_DIR
+
             if [ -d "$REPO_DIR/.git" ]; then
               cd $REPO_DIR
               git pull origin main
@@ -38,54 +39,39 @@ jobs:
               git clone https://github.com/JERSONLEIBOY/express-mongodb-backend-api.git $REPO_DIR
               cd $REPO_DIR
             fi
-            
-            npm install --production
-            
+
+            # 复制 docker 相关文件到构建上下文
+            cp docker/Dockerfile $REPO_DIR/
+            cp docker-compose.yml $REPO_DIR/
+
+            # 构建 Docker 镜像
+            cd $REPO_DIR
+            docker build -t ghcr.io/jersonleiboy/express-mongodb-backend-api:$IMAGE_TAG -f Dockerfile .
+
+            # 写入环境变量文件
             cat > .env << EOF
-NODE_ENV=production
-PORT=3000
-MONGODB_URI=mongodb://localhost:27017/ele_admin
 JWT_SECRET=$JWT_SECRET
-JWT_EXPIRES_IN=7d
 CORS_ORIGIN=$CORS_ORIGIN
-LOG_RETENTION_DAYS=30
-RESPONSE_TIME_ZONE=Asia/Shanghai
-UPLOAD_PATH=./src/uploads
-UPLOAD_MAX_SIZE=10485760
 EOF
-            
+
+            # 停止旧容器
+            cd $REPO_DIR
             docker-compose down 2>/dev/null || true
-            
-            cat > docker-compose.yml << EOF
-version: '3.8'
-services:
-  mongodb:
-    image: mongo:7
-    container_name: ele_admin_mongodb
-    restart: unless-stopped
-    ports:
-      - "27017:27017"
-    volumes:
-      - mongodb_data:/data/db
-volumes:
-  mongodb_data:
-EOF
-            
-            docker-compose up -d
-            
-            sleep 10
-            
-            pkill -f "node src/app.js" 2>/dev/null || true
-            
-            nohup node src/app.js > /var/log/ele_admin.log 2>&1 &
-            
-            sleep 10
-            
-            if curl -sf http://localhost:3000/health > /dev/null; then
-              echo "✅ 部署成功"
-            else
-              echo "❌ 部署失败"
-              exit 1
-            fi
-            
-            echo "===== 部署完成 ====="
+
+            # 启动服务（使用已构建的镜像）
+            IMAGE_TAG=$IMAGE_TAG docker-compose up -d
+
+            # 等待服务健康
+            echo "等待服务启动..."
+            for i in $(seq 1 30); do
+              if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
+                echo "✅ 部署成功 - 服务已就绪"
+                exit 0
+              fi
+              echo "等待中... ($i/30)"
+              sleep 2
+            done
+
+            echo "❌ 部署失败 - 服务健康检查未通过"
+            docker-compose logs app
+            exit 1
