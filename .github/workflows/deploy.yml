@@ -40,8 +40,7 @@ jobs:
               cd $REPO_DIR
             fi
 
-            cp docker/Dockerfile $REPO_DIR/
-            cp docker-compose.yml $REPO_DIR/
+            cp docker/Dockerfile .
 
             cd $REPO_DIR
             docker build -t ghcr.io/jersonleiboy/express-mongodb-backend-api:$IMAGE_TAG -f Dockerfile .
