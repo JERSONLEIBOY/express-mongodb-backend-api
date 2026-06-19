@@ -14,7 +14,7 @@ FROM node:18-alpine
 WORKDIR /app
 
 # 安装 curl（用于健康检查）
-RUN apk add --no-cache curl
+RUN apk add --no-cache curl tini
 
 # 从依赖阶段复制 node_modules
 COPY --from=deps /app/node_modules ./node_modules

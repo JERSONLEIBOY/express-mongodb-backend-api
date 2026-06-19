@@ -20,7 +20,7 @@ services:
       start_period: 30s
 
   app:
-    image: ghcr.io/${GITHUB_REPOSITORY:-jersonleiboy/express-mongodb-backend-api}:${IMAGE_TAG:-latest}
+    image: ghcr.io/jersonleiboy/express-mongodb-backend-api:${IMAGE_TAG:-latest}
     container_name: ele_admin_backend
     restart: unless-stopped
     environment:
