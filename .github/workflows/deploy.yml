@@ -58,15 +58,15 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          envs:
-            APP_DIR,IMAGE_TAG,IMAGE_FULL
           script: |
             set -e
 
-            cd $APP_DIR
-
+            APP_DIR="/opt/ele_admin"
             IMAGE_TAG="sha-${{ github.sha }}"
-            IMAGE_FULL="${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}:${IMAGE_TAG}"
+            IMAGE_NAME="ghcr.io/jersonleiboy/express-mongodb-backend-api"
+            IMAGE_FULL="${IMAGE_NAME}:${IMAGE_TAG}"
+
+            cd $APP_DIR
 
             echo "=========================================="
             echo "  开始部署"
@@ -84,7 +84,7 @@ jobs:
 
             echo ""
             echo "拉取新镜像..."
-            docker compose pull
+            docker pull ${IMAGE_FULL}
 
             echo ""
             echo "$IMAGE_TAG $(date +%Y-%m-%d_%H:%M:%S)" > .versions
