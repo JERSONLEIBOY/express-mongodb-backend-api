@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 env:
-  IMAGE_NAME: ghcr.io/JERSONLEIBOY/express-mongodb-backend-api
+  IMAGE_NAME: ghcr.io/jersonleiboy/express-mongodb-backend-api
 
 jobs:
   build:

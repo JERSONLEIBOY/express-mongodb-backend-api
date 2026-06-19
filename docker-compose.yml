@@ -22,7 +22,7 @@ services:
     build:
       context: .
       dockerfile: docker/Dockerfile
-    image: ghcr.io/JERSONLEIBOY/express-mongodb-backend-api:${IMAGE_TAG:-latest}
+    image: ghcr.io/jersonleiboy/express-mongodb-backend-api:${IMAGE_TAG:-latest}
     container_name: ele_admin_backend
     restart: unless-stopped
     ports:
