@@ -40,28 +40,18 @@ jobs:
               cd $REPO_DIR
             fi
 
-            # 复制 docker 相关文件到构建上下文
             cp docker/Dockerfile $REPO_DIR/
             cp docker-compose.yml $REPO_DIR/
 
-            # 构建 Docker 镜像
             cd $REPO_DIR
             docker build -t ghcr.io/jersonleiboy/express-mongodb-backend-api:$IMAGE_TAG -f Dockerfile .
 
-            # 写入环境变量文件
-            cat > .env << EOF
-JWT_SECRET=$JWT_SECRET
-CORS_ORIGIN=$CORS_ORIGIN
-EOF
+            printf 'JWT_SECRET=%s\nCORS_ORIGIN=%s\n' "$JWT_SECRET" "$CORS_ORIGIN" > .env
 
-            # 停止旧容器
-            cd $REPO_DIR
             docker-compose down 2>/dev/null || true
 
-            # 启动服务（使用已构建的镜像）
             IMAGE_TAG=$IMAGE_TAG docker-compose up -d
 
-            # 等待服务健康
             echo "等待服务启动..."
             for i in $(seq 1 30); do
               if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
