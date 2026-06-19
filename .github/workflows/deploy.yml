@@ -8,6 +8,9 @@ on:
 jobs:
   deploy:
     runs-on: ubuntu-latest
+    env:
+      JWT_SECRET: ${{ secrets.JWT_SECRET }}
+      CORS_ORIGIN: ${{ secrets.CORS_ORIGIN || '*' }}
     steps:
       - name: Deploy to server via SSH
         uses: appleboy/ssh-action@v1
@@ -16,10 +19,12 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
+          envs: JWT_SECRET,CORS_ORIGIN
           script: |
             set -e
+            
             APP_DIR="/opt/ele_admin"
-            REPO_DIR="/tmp/express-mongodb-backend-api"
+            REPO_DIR="$APP_DIR/repo"
             
             echo "===== 开始部署 ====="
             
@@ -30,18 +35,28 @@ jobs:
               cd $REPO_DIR
               git pull origin main
             else
-              rm -rf $REPO_DIR
               git clone https://github.com/JERSONLEIBOY/express-mongodb-backend-api.git $REPO_DIR
               cd $REPO_DIR
             fi
             
-            IMAGE_TAG=$(git rev-parse HEAD)
-            docker build -f docker/Dockerfile -t ele_admin_backend:$IMAGE_TAG .
-            docker tag ele_admin_backend:$IMAGE_TAG ele_admin_backend:latest
+            npm install --production
             
-            cd $APP_DIR
+            cat > .env << EOF
+NODE_ENV=production
+PORT=3000
+MONGODB_URI=mongodb://localhost:27017/ele_admin
+JWT_SECRET=$JWT_SECRET
+JWT_EXPIRES_IN=7d
+CORS_ORIGIN=$CORS_ORIGIN
+LOG_RETENTION_DAYS=30
+RESPONSE_TIME_ZONE=Asia/Shanghai
+UPLOAD_PATH=./src/uploads
+UPLOAD_MAX_SIZE=10485760
+EOF
             
-            cat > docker-compose.yml << 'EOF'
+            docker-compose down 2>/dev/null || true
+            
+            cat > docker-compose.yml << EOF
 version: '3.8'
 services:
   mongodb:
@@ -52,60 +67,25 @@ services:
       - "27017:27017"
     volumes:
       - mongodb_data:/data/db
-    environment:
-      MONGO_INITDB_DATABASE: ele_admin
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 30s
-      timeout: 10s
-      retries: 5
-      start_period: 30s
-  app:
-    image: ele_admin_backend:latest
-    container_name: ele_admin_backend
-    restart: unless-stopped
-    ports:
-      - "3000:3000"
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    environment:
-      NODE_ENV: production
-      PORT: 3000
-      MONGODB_URI: mongodb://mongodb:27017/ele_admin
-      JWT_SECRET: ${{ secrets.JWT_SECRET }}
-      JWT_EXPIRES_IN: 7d
-      CORS_ORIGIN: ${{ secrets.CORS_ORIGIN || '*' }}
-      LOG_RETENTION_DAYS: 30
-      RESPONSE_TIME_ZONE: Asia/Shanghai
-      UPLOAD_PATH: ./src/uploads
-      UPLOAD_MAX_SIZE: 10485760
-    volumes:
-      - app_uploads:/app/src/uploads
-    healthcheck:
-      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://localhost:3000/health"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
-      start_period: 40s
 volumes:
   mongodb_data:
-  app_uploads:
 EOF
             
-            docker-compose down --remove-orphans 2>/dev/null || true
             docker-compose up -d
             
-            sleep 15
-            docker-compose ps
+            sleep 10
             
-            for i in $(seq 1 30); do
-              if curl -sf http://localhost:3000/health > /dev/null; then
-                echo "✅ 应用健康检查通过"
-                break
-              fi
-              echo "等待中... (${i}/30)"
-              sleep 2
-            done
+            pkill -f "node src/app.js" 2>/dev/null || true
+            
+            nohup node src/app.js > /var/log/ele_admin.log 2>&1 &
+            
+            sleep 10
+            
+            if curl -sf http://localhost:3000/health > /dev/null; then
+              echo "✅ 部署成功"
+            else
+              echo "❌ 部署失败"
+              exit 1
+            fi
             
             echo "===== 部署完成 ====="
