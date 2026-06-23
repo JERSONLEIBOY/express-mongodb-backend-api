@@ -19,7 +19,7 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 2222 }}
-          envs: JWT_SECRET,CORS_ORIGIN
+          envs: JWT_SECRET,CORS_ORIGIN,MONGO_USERNAME,MONGO_PASSWORD
           script: |
             set -e
 
@@ -45,7 +45,7 @@ jobs:
             cd $REPO_DIR
             docker build -t ghcr.io/jersonleiboy/express-mongodb-backend-api:$IMAGE_TAG -f Dockerfile .
 
-            printf 'JWT_SECRET=%s\nCORS_ORIGIN=%s\n' "$JWT_SECRET" "$CORS_ORIGIN" > .env
+            printf 'JWT_SECRET=%s\nCORS_ORIGIN=%s\nMONGO_USERNAME=%s\nMONGO_PASSWORD=%s\n' "$JWT_SECRET" "$CORS_ORIGIN" "$MONGO_USERNAME" "$MONGO_PASSWORD" > .env
 
             docker-compose down --remove-orphans 2>/dev/null || true
             docker rm -f ele_admin_mongodb ele_admin_backend 2>/dev/null || true
