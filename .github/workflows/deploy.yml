@@ -6,13 +6,48 @@ on:
   workflow_dispatch:
 
 jobs:
-  deploy:
+  build-and-push:
     runs-on: ubuntu-latest
+    outputs:
+      image_tag: ${{ steps.meta.outputs.version }}
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Deploy to server via SSH
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push image
+        id: meta
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          tags: ghcr.io/jersonleiboy/express-mongodb-backend-api:latest
+
+  deploy:
+    runs-on: ubuntu-latest
+    needs: build-and-push
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Copy docker-compose.yml to server
+        uses: appleboy/scp-action@v0.1.7
+        with:
+          host: ${{ secrets.SERVER_HOST }}
+          username: ${{ secrets.SERVER_USER }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
+          source: docker-compose.yml
+          target: /opt/ele_admin/repo
+
+      - name: Deploy on server
         uses: appleboy/ssh-action@v1
         env:
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
@@ -23,50 +58,32 @@ jobs:
           host: ${{ secrets.SERVER_HOST }}
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT || 2222 }}
+          port: ${{ secrets.SERVER_PORT || 22 }}
           envs: JWT_SECRET,CORS_ORIGIN,MONGO_USERNAME,MONGO_PASSWORD
           script: |
             set -e
+            cd /opt/ele_admin/repo
 
-            APP_DIR="/opt/ele_admin"
-            REPO_DIR="$APP_DIR/repo"
-            IMAGE_TAG="latest"
+            printf 'JWT_SECRET=%s\nCORS_ORIGIN=%s\nMONGO_USERNAME=%s\nMONGO_PASSWORD=%s\n' \
+              "$JWT_SECRET" "$CORS_ORIGIN" "$MONGO_USERNAME" "$MONGO_PASSWORD" > .env
 
-            echo "===== 开始部署 ====="
+            echo "${{ secrets.GITHUB_TOKEN }}" | docker login ghcr.io -u ${{ github.actor }} --password-stdin
 
-            sudo mkdir -p $APP_DIR
-            sudo chown -R $USER:$USER $APP_DIR
-
-            if [ -d "$REPO_DIR/.git" ]; then
-              cd $REPO_DIR
-              git pull origin main
-            else
-              git clone https://github.com/JERSONLEIBOY/express-mongodb-backend-api.git $REPO_DIR
-              cd $REPO_DIR
-            fi
-
-            cp docker/Dockerfile .
-
-            cd $REPO_DIR
-            docker build -t ghcr.io/jersonleiboy/express-mongodb-backend-api:$IMAGE_TAG -f Dockerfile .
-
-            printf 'JWT_SECRET=%s\nCORS_ORIGIN=%s\nMONGO_USERNAME=%s\nMONGO_PASSWORD=%s\n' "$JWT_SECRET" "$CORS_ORIGIN" "$MONGO_USERNAME" "$MONGO_PASSWORD" > .env
-
+            docker-compose pull
             docker-compose down --remove-orphans 2>/dev/null || true
             docker rm -f ele_admin_mongodb ele_admin_backend 2>/dev/null || true
-
-            IMAGE_TAG=$IMAGE_TAG docker-compose up -d
+            docker-compose up -d
 
             echo "等待服务启动..."
             for i in $(seq 1 30); do
               if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
-                echo "✅ 部署成功 - 服务已就绪"
+                echo "✅ 部署成功"
                 exit 0
               fi
               echo "等待中... ($i/30)"
               sleep 2
             done
 
-            echo "❌ 部署失败 - 服务健康检查未通过"
+            echo "❌ 服务健康检查未通过"
             docker-compose logs app
             exit 1
