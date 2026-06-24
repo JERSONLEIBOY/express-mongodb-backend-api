@@ -5,12 +5,19 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  IMAGE_NAME: ele_admin_backend
+
 jobs:
   deploy:
     runs-on: ubuntu-latest
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
+
+      - name: Generate version tag
+        id: version
+        run: echo "tag=commit-$(git rev-parse --short HEAD)" >> $GITHUB_OUTPUT
 
       - name: Copy code to server
         uses: appleboy/scp-action@v0.1.7
@@ -25,6 +32,7 @@ jobs:
       - name: Build and deploy on server
         uses: appleboy/ssh-action@v1
         env:
+          COMMIT_TAG: ${{ steps.version.outputs.tag }}
           JWT_SECRET: ${{ secrets.JWT_SECRET }}
           CORS_ORIGIN: ${{ secrets.CORS_ORIGIN }}
           MONGO_USERNAME: ${{ secrets.MONGO_USERNAME }}
@@ -34,30 +42,51 @@ jobs:
           username: ${{ secrets.SERVER_USER }}
           key: ${{ secrets.SERVER_SSH_KEY }}
           port: ${{ secrets.SERVER_PORT || 22 }}
-          envs: JWT_SECRET,CORS_ORIGIN,MONGO_USERNAME,MONGO_PASSWORD
+          envs: COMMIT_TAG,IMAGE_NAME,JWT_SECRET,CORS_ORIGIN,MONGO_USERNAME,MONGO_PASSWORD
           script: |
             set -e
             cd /opt/ele_admin/repo
 
-            printf 'JWT_SECRET=%s\nCORS_ORIGIN=%s\nMONGO_USERNAME=%s\nMONGO_PASSWORD=%s\n' \
-              "$JWT_SECRET" "$CORS_ORIGIN" "$MONGO_USERNAME" "$MONGO_PASSWORD" > .env
+            # 生成 .env 文件（包含 IMAGE_TAG 供 docker-compose 使用）
+            printf 'JWT_SECRET=%s\nCORS_ORIGIN=%s\nMONGO_USERNAME=%s\nMONGO_PASSWORD=%s\nIMAGE_TAG=%s\n' \
+              "$JWT_SECRET" "$CORS_ORIGIN" "$MONGO_USERNAME" "$MONGO_PASSWORD" "$COMMIT_TAG" > .env
+            chmod 600 .env
 
-            docker build -t ele_admin_backend:latest -f docker/Dockerfile .
+            # 构建镜像（带版本标签 + latest）
+            docker build \
+              --tag ${IMAGE_NAME}:${COMMIT_TAG} \
+              --tag ${IMAGE_NAME}:latest \
+              -f docker/Dockerfile .
 
+            # 停止并清理旧容器
             docker-compose down --remove-orphans 2>/dev/null || true
             docker rm -f ele_admin_mongodb ele_admin_backend 2>/dev/null || true
+
+            # 启动新服务
             docker-compose up -d
 
+            # 健康检查（最多等待 60 秒）
             echo "等待服务启动..."
             for i in $(seq 1 30); do
               if curl -sf http://localhost:3000/health > /dev/null 2>&1; then
-                echo "✅ 部署成功"
-                exit 0
+                echo "✅ 部署成功 (${COMMIT_TAG})"
+                break
+              fi
+              if [ "$i" -eq 30 ]; then
+                echo "❌ 服务健康检查未通过"
+                docker-compose logs app --tail 50
+                exit 1
               fi
               echo "等待中... ($i/30)"
               sleep 2
             done
 
-            echo "❌ 服务健康检查未通过"
-            docker-compose logs app
-            exit 1
+            # 清理旧镜像（保留最近 3 个版本）
+            echo "清理旧镜像..."
+            docker images ${IMAGE_NAME} --format '{{.Tag}}' | grep '^commit-' \
+              | sort -r | tail -n +4 | xargs -I {} docker rmi ${IMAGE_NAME}:{} 2>/dev/null || true
+
+            # 清理 dangling 镜像
+            docker image prune -f
+
+            echo "✅ 部署完成"
